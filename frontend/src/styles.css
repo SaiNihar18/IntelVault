@@ -1,0 +1,203 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Source Code Pro", ui-monospace, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 32px oklch(0.78 0.16 158 / 0.18);
+}
+
+/* Dark-first design — IntelVault uses dark theme exclusively */
+:root {
+  --radius: 0.5rem;
+
+  /* Surfaces */
+  --background: oklch(0.18 0 0);            /* #1C1C1C */
+  --foreground: oklch(0.94 0 0);            /* #EDEDED */
+  --surface: oklch(0.24 0 0);               /* #2E2E2E */
+  --card: oklch(0.24 0 0);
+  --card-foreground: oklch(0.94 0 0);
+  --popover: oklch(0.22 0 0);
+  --popover-foreground: oklch(0.94 0 0);
+
+  /* Brand emerald */
+  --brand: oklch(0.78 0.16 158);            /* #3ECF8E */
+  --brand-foreground: oklch(0.18 0 0);
+  --primary: oklch(0.78 0.16 158);
+  --primary-foreground: oklch(0.18 0 0);
+
+  --secondary: oklch(0.26 0 0);
+  --secondary-foreground: oklch(0.94 0 0);
+  --muted: oklch(0.26 0 0);
+  --muted-foreground: oklch(0.62 0 0);      /* #888 */
+  --accent: oklch(0.30 0.02 158);
+  --accent-foreground: oklch(0.94 0 0);
+
+  --destructive: oklch(0.66 0.20 22);       /* #F66061 */
+  --destructive-foreground: oklch(0.98 0 0);
+  --warning: oklch(0.82 0.15 80);           /* #F4BD50 */
+  --warning-foreground: oklch(0.18 0 0);
+  --success: oklch(0.78 0.16 158);
+  --success-foreground: oklch(0.18 0 0);
+
+  --border: oklch(0.28 0 0);                /* #333 */
+  --input: oklch(0.26 0 0);
+  --ring: oklch(0.78 0.16 158);
+
+  --sidebar: oklch(0.16 0 0);
+  --sidebar-foreground: oklch(0.94 0 0);
+  --sidebar-primary: oklch(0.78 0.16 158);
+  --sidebar-primary-foreground: oklch(0.18 0 0);
+  --sidebar-accent: oklch(0.24 0 0);
+  --sidebar-accent-foreground: oklch(0.94 0 0);
+  --sidebar-border: oklch(0.24 0 0);
+  --sidebar-ring: oklch(0.78 0.16 158);
+}
+
+.dark {
+  /* Same — already dark */
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code,
+  pre,
+  kbd,
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Subtle grid background used on auth + share screens */
+  .iv-grid-bg {
+    background-color: var(--color-background);
+    background-image:
+      radial-gradient(
+        ellipse 80% 60% at 50% 50%,
+        oklch(0.32 0.10 158 / 0.18),
+        transparent 70%
+      ),
+      linear-gradient(to right, oklch(0.28 0.02 158 / 0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(0.28 0.02 158 / 0.15) 1px, transparent 1px);
+    background-size: auto, 32px 32px, 32px 32px;
+  }
+
+  ::selection {
+    background: oklch(0.78 0.16 158 / 0.35);
+    color: var(--foreground);
+  }
+
+  /* Smooth scrollbars in dark surfaces */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.32 0 0);
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.40 0 0);
+  }
+}
+
+@layer utilities {
+  .transition-base {
+    transition: background-color 200ms ease, color 200ms ease,
+      border-color 200ms ease, transform 200ms ease, opacity 200ms ease,
+      box-shadow 200ms ease;
+  }
+
+  .text-brand {
+    color: var(--color-brand);
+  }
+  .bg-brand {
+    background-color: var(--color-brand);
+  }
+
+  @keyframes iv-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-up {
+    animation: iv-fade-up 400ms ease-out both;
+  }
+
+  @keyframes iv-pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .animate-pulse-dot {
+    animation: iv-pulse-dot 2s ease-in-out infinite;
+  }
+}

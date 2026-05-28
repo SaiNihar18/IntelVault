@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react";
-import { Search, Filter, ChevronLeft, ChevronRight, Bot, FileText, MessageSquare } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Bot, FileText, MessageSquare } from "lucide-react";
 import { useAuditLog, type AuditEntry } from "@/hooks/api";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ACTION_STYLES: Record<string, string> = {
   UPLOADED: "text-brand",
@@ -29,21 +36,30 @@ export function AuditTab({ workspaceId }: { workspaceId: string }) {
   const { data: entries, isLoading } = useAuditLog(workspaceId);
   const entriesArray = Array.isArray(entries) ? entries : (entries as any)?.events ?? [];
   const [query, setQuery] = useState("");
+  const [filterType, setFilterType] = useState("all");
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
+  const eventTypes = useMemo(() => {
+    return [...new Set(entriesArray.map((e: any) => e.event_type))];
+  }, [entriesArray]);
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    return (entriesArray ?? []).filter(
-      (e) =>
+    return (entriesArray ?? []).filter((e) => {
+      if (filterType !== "all" && e.event_type !== filterType) {
+        return false;
+      }
+      return (
         !q ||
         e.event_type.toLowerCase().includes(q) ||
         e.actor_user_id?.toLowerCase().includes(q) ||
         e.document_id?.toLowerCase().includes(q) ||
         e.chat_session_id?.toLowerCase().includes(q) ||
-        JSON.stringify(e.event_metadata).toLowerCase().includes(q),
-    );
-  }, [entries, query]);
+        JSON.stringify(e.event_metadata).toLowerCase().includes(q)
+      );
+    });
+  }, [entriesArray, query, filterType]);
 
   const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
   const start = filtered.length ? (page - 1) * pageSize + 1 : 0;
@@ -71,9 +87,25 @@ export function AuditTab({ workspaceId }: { workspaceId: string }) {
               className="bg-surface border border-border rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand w-60 transition-base"
             />
           </div>
-          <button className="inline-flex items-center gap-2 bg-surface border border-border rounded-md px-3 py-2 text-sm hover:border-brand/60 transition-base">
-            <Filter size={14} /> Filter
-          </button>
+          <Select
+            value={filterType}
+            onValueChange={(val) => {
+              setFilterType(val);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[180px] bg-surface border-border">
+              <SelectValue placeholder="All Events" />
+            </SelectTrigger>
+            <SelectContent className="bg-surface border-border">
+              <SelectItem value="all">All Events</SelectItem>
+              {eventTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

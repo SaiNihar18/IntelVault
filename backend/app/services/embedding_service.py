@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import time
 from abc import ABC, abstractmethod
+from urllib import error, request
 
 from app.core.config import settings
 
@@ -34,5 +37,78 @@ class DeterministicEmbeddingProvider(EmbeddingProvider):
         return out
 
 
+class GeminiEmbeddingProvider(EmbeddingProvider):
+    """Real semantic embeddings using Gemini's gemini-embedding-2 model."""
+
+    def __init__(self, api_key: str, base_url: str, dimension: int) -> None:
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.dimension = dimension
+        self.fallback = DeterministicEmbeddingProvider(dimension)
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return [self._embed_one(text) for text in texts]
+
+    def _embed_one(self, text: str) -> list[float]:
+        payload = {
+            "model": "models/gemini-embedding-2",
+            "content": {
+                "parts": [{"text": text}]
+            },
+            "outputDimensionality": self.dimension
+        }
+        data = json.dumps(payload).encode("utf-8")
+        url = f"{self.base_url}/models/gemini-embedding-2:embedContent?key={self.api_key}"
+        req = request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        max_attempts = max(1, settings.GEMINI_MAX_RETRIES + 1)
+
+        for attempt in range(max_attempts):
+            try:
+                with request.urlopen(req, timeout=settings.GEMINI_REQUEST_TIMEOUT_SECONDS) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                break
+            except error.HTTPError as exc:
+                # 429 (Rate limit) and >=500 are retryable
+                if exc.code == 429 or exc.code >= 500:
+                    if attempt >= max_attempts - 1:
+                        return self.fallback._embed_one(text)
+                    retry_after = exc.headers.get("Retry-After")
+                    try:
+                        delay = max(0.1, float(retry_after)) if retry_after else settings.GEMINI_RETRY_BASE_DELAY_SECONDS * (2**attempt)
+                    except (ValueError, TypeError):
+                        delay = settings.GEMINI_RETRY_BASE_DELAY_SECONDS * (2**attempt)
+                    time.sleep(delay)
+                    continue
+                else:
+                    # Non-retryable HTTP error (e.g. 400, 403, 404)
+                    return self.fallback._embed_one(text)
+            except Exception:
+                # Network or timeout errors
+                if attempt >= max_attempts - 1:
+                    return self.fallback._embed_one(text)
+                time.sleep(settings.GEMINI_RETRY_BASE_DELAY_SECONDS * (2**attempt))
+                continue
+        else:
+            return self.fallback._embed_one(text)
+
+        embedding = body.get("embedding") or {}
+        values = embedding.get("values")
+        if not values or len(values) != self.dimension:
+            return self.fallback._embed_one(text)
+        return [float(v) for v in values]
+
+
 def get_embedding_provider() -> EmbeddingProvider:
+    if settings.LLM_PROVIDER.lower() == "gemini" and settings.GEMINI_API_KEY:
+        return GeminiEmbeddingProvider(
+            api_key=settings.GEMINI_API_KEY,
+            base_url=settings.GEMINI_API_BASE_URL,
+            dimension=settings.EMBEDDING_DIMENSION,
+        )
     return DeterministicEmbeddingProvider(dimension=settings.EMBEDDING_DIMENSION)
+

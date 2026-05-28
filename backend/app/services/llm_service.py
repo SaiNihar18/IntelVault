@@ -26,11 +26,21 @@ class DeterministicChatProvider(ChatCompletionProvider):
 
 def _build_context_prompt(question: str, context_blocks: list[str]) -> str:
     trimmed_blocks = [block.strip()[:900] for block in context_blocks[:4] if block.strip()]
+    if not trimmed_blocks:
+        return (
+            "You are IntelVault AI, a helpful secure document assistant. "
+            "The user is asking a general question or greeting. "
+            "Respond politely and conversationally.\n\n"
+            f"Question: {question}"
+        )
     context_text = "\n\n".join(trimmed_blocks)
     return (
-        "Answer the question using only the provided context. "
-        "If the context is insufficient, say so clearly.\n\n"
-        f"Context:\n{context_text}\n\nQuestion: {question}"
+        "You are IntelVault AI, a secure document assistant. "
+        "Answer the user's question using the provided document context blocks. "
+        "Cite the document and page details if helpful. "
+        "If the context doesn't contain the answer, use your general knowledge but mention that it is not explicitly stated in the workspace documents.\n\n"
+        f"Context:\n{context_text}\n\n"
+        f"Question: {question}"
     )
 
 

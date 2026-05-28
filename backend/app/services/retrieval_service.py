@@ -61,6 +61,7 @@ async def retrieve_relevant_chunks(
     question: str,
     top_k: int | None = None,
     min_score: float | None = None,
+    document_ids: list[UUID] | None = None,
 ) -> list[RetrievedChunk]:
     latest_versions_subquery = (
         select(
@@ -71,6 +72,14 @@ async def retrieve_relevant_chunks(
         .subquery()
     )
 
+    conditions = [
+        Document.workspace_id == workspace_id,
+        Document.status == "ready",
+        DocumentVersion.status == "ready",
+    ]
+    if document_ids:
+        conditions.append(Document.id.in_(document_ids))
+
     result = await session.execute(
         select(DocumentChunk, Document, DocumentVersion)
         .join(DocumentVersion, DocumentChunk.document_version_id == DocumentVersion.id)
@@ -80,11 +89,7 @@ async def retrieve_relevant_chunks(
             (latest_versions_subquery.c.document_id == DocumentVersion.document_id)
             & (latest_versions_subquery.c.version_number == DocumentVersion.version_number),
         )
-        .where(
-            Document.workspace_id == workspace_id,
-            Document.status == "ready",
-            DocumentVersion.status == "ready",
-        )
+        .where(*conditions)
     )
 
     rows = result.all()

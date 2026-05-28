@@ -76,6 +76,7 @@ async def ask_chat(
         question=body.question,
         chat_session_id=body.chat_session_id,
         debug_retrieval=body.debug_retrieval,
+        document_ids=body.document_ids,
     )
     return ChatResponse(
         chat_session_id=result.chat_session.id,

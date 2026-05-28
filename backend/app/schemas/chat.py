@@ -10,6 +10,7 @@ class ChatAskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     chat_session_id: UUID | None = None
     debug_retrieval: bool = False
+    document_ids: list[UUID] | None = None
 
 
 class ChatSourcePublic(BaseModel):

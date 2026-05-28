@@ -7,14 +7,20 @@ import {
   Link as LinkIcon,
   FileText,
   Bot,
+  X,
+  Check,
+  Loader2,
 } from "lucide-react";
 import {
   useChatMessages,
   useChatSessions,
   useSendChatMessage,
+  useDocuments,
+  useUploadDocument,
   type ChatMessage,
 } from "@/hooks/api";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 function relTime(s: string) {
   const d = new Date(s);
@@ -32,34 +38,58 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
   const { data: sessions } = useChatSessions(workspaceId);
   const sessionsArray = Array.isArray(sessions) ? sessions : (sessions as any)?.sessions ?? [];
   const [activeSession, setActiveSession] = useState<string | null>(null);
+  const [hasSelectedInitial, setHasSelectedInitial] = useState(false);
   const { data: messages } = useChatMessages(workspaceId, activeSession);
   const send = useSendChatMessage(workspaceId);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const { data: documents } = useDocuments(workspaceId);
+  const uploadDoc = useUploadDocument(workspaceId);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+
   useEffect(() => {
-    if (!activeSession && sessionsArray[0]) setActiveSession(sessionsArray[0].id);
-  }, [sessionsArray, activeSession]);
+    setHasSelectedInitial(false);
+    setActiveSession(null);
+    setSelectedDocs([]);
+    setPendingQuestion(null);
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (sessionsArray.length > 0 && !activeSession && !hasSelectedInitial) {
+      setActiveSession(sessionsArray[0].id);
+      setHasSelectedInitial(true);
+    }
+  }, [sessionsArray, activeSession, hasSelectedInitial]);
+
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages]);
+  }, [messages, pendingQuestion]);
 
   async function handleSend() {
     const q = input.trim();
     if (!q || send.isPending) return;
     setInput("");
+    setPendingQuestion(q);
     try {
       const res = await send.mutateAsync({
         question: q,
         chat_session_id: activeSession ?? undefined,
+        document_ids: selectedDocs.length > 0 ? selectedDocs : undefined,
       });
       if (!activeSession) setActiveSession(res.chat_session_id);
     } catch {
       /* surface via toast happens in caller if needed */
+    } finally {
+      setPendingQuestion(null);
     }
   }
 
@@ -126,8 +156,18 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
             </div>
           )}
           {messages?.map((m) => <MessageBubble key={m.id} m={m} />)}
+          {pendingQuestion && (
+            <div className="flex flex-col items-end animate-fade-up">
+              <div className="bg-background border border-border rounded-xl px-4 py-3 max-w-[80%] text-sm opacity-70">
+                {pendingQuestion}
+              </div>
+              <span className="text-xs text-muted-foreground mt-1 font-mono text-[10px] animate-pulse">
+                Sending to IntelVault AI…
+              </span>
+            </div>
+          )}
           {send.isPending && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 animate-fade-in">
               <span className="w-2 h-2 rounded-full bg-brand animate-pulse-dot" />
               IntelVault AI is thinking…
             </div>
@@ -135,6 +175,40 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
         </div>
 
         <div className="border-t border-border p-4 space-y-3">
+          {/* Selected documents pills */}
+          {selectedDocs.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border/40">
+              {selectedDocs.map((docId) => {
+                const doc = documents?.find((d) => d.id === docId);
+                if (!doc) return null;
+                return (
+                  <div
+                    key={docId}
+                    className="inline-flex items-center gap-1.5 text-xs font-mono bg-brand/10 border border-brand/20 text-brand px-2.5 py-1 rounded-md animate-fade-in"
+                  >
+                    <FileText size={11} />
+                    <span className="truncate max-w-44">{doc.filename}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDocs(selectedDocs.filter((id) => id !== docId))}
+                      className="hover:bg-brand/20 rounded p-0.5 transition-base cursor-pointer"
+                      aria-label="Remove attachment"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setSelectedDocs([])}
+                className="text-[10px] text-muted-foreground hover:text-foreground underline transition-base cursor-pointer px-1 self-center"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -150,10 +224,113 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
           />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 text-muted-foreground">
-              <button type="button" aria-label="Attach" className="hover:text-foreground transition-base">
-                <Paperclip size={16} />
-              </button>
-              <button type="button" aria-label="Tag" className="hover:text-foreground transition-base">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowAttachMenu(!showAttachMenu)}
+                  aria-label="Attach"
+                  className={cn(
+                    "hover:text-foreground transition-all duration-300 hover:scale-115 active:scale-95 cursor-pointer relative flex items-center justify-center w-6 h-6 rounded hover:bg-sidebar-accent/60",
+                    selectedDocs.length > 0 && "text-brand bg-brand/5"
+                  )}
+                >
+                  <Paperclip size={16} />
+                  {selectedDocs.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-brand text-[9px] font-bold text-brand-foreground rounded-full flex items-center justify-center animate-fade-in border border-background">
+                      {selectedDocs.length}
+                    </span>
+                  )}
+                </button>
+
+                {showAttachMenu && (
+                  <div className="absolute bottom-8 left-0 w-72 bg-surface border border-border rounded-xl p-4 shadow-xl z-20 animate-fade-up">
+                    <div className="flex items-center justify-between border-b border-border pb-2 mb-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Attach context files</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAttachMenu(false)}
+                        className="text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadDoc.isPending}
+                      className="w-full flex items-center justify-center gap-2 border border-dashed border-border hover:border-brand/50 hover:bg-brand/5 py-2 py-2 rounded-lg text-xs font-semibold mb-3 cursor-pointer text-brand transition-base"
+                    >
+                      {uploadDoc.isPending ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Plus size={12} />
+                      )}
+                      Upload file to chat
+                    </button>
+                    
+                    <div className="max-h-40 overflow-y-auto space-y-1 pr-0.5">
+                      {!documents?.length ? (
+                        <div className="text-center text-xs text-muted-foreground py-4">No workspace files found.</div>
+                      ) : (
+                        documents.map((doc) => {
+                          const selected = selectedDocs.includes(doc.id);
+                          return (
+                            <button
+                              key={doc.id}
+                              type="button"
+                              onClick={() => {
+                                if (selected) {
+                                  setSelectedDocs(selectedDocs.filter((id) => id !== doc.id));
+                                } else {
+                                  setSelectedDocs([...selectedDocs, doc.id]);
+                                }
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs transition-base cursor-pointer border border-transparent",
+                                selected ? "bg-brand/10 border-brand/20 text-brand font-medium" : "hover:bg-background text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              <FileText size={12} className={selected ? "text-brand" : "text-muted-foreground"} />
+                              <span className="truncate flex-1 font-mono text-[11px]">{doc.filename}</span>
+                              {selected && <Check size={12} className="text-brand shrink-0" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  const files = e.target.files;
+                  if (!files || files.length === 0) return;
+                  const file = files[0];
+                  try {
+                    toast.promise(uploadDoc.mutateAsync(file), {
+                      loading: `Uploading ${file.name} to workspace...`,
+                      success: (res: any) => {
+                        setSelectedDocs((prev) => [...prev, res.document.id]);
+                        return `Uploaded and attached ${file.name}`;
+                      },
+                      error: (err) => err?.response?.data?.detail ?? `Failed to upload ${file.name}`
+                    });
+                  } catch {
+                    // Handled in promise
+                  }
+                }}
+              />
+
+              <button
+                type="button"
+                aria-label="Tag"
+                className="hover:text-foreground cursor-pointer hover:scale-115 active:scale-95 transition-all duration-300 flex items-center justify-center w-6 h-6 rounded hover:bg-sidebar-accent/60"
+              >
                 <Tag size={16} />
               </button>
               <span className="text-xs flex items-center gap-1.5">
@@ -165,7 +342,7 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
               type="button"
               onClick={handleSend}
               disabled={!input.trim() || send.isPending}
-              className="bg-brand text-brand-foreground p-2 rounded-md hover:opacity-90 disabled:opacity-40 transition-base"
+              className="bg-brand text-brand-foreground p-2 rounded-md hover:opacity-90 disabled:opacity-40 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
               aria-label="Send"
             >
               <Send size={16} />

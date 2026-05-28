@@ -256,7 +256,7 @@ function StatusBadge({ status }: { status: DocumentItem["status"] }) {
       icon: RefreshCw,
       label: "Uploaded",
     },
-    completed: {
+    ready: {
       cls: "bg-brand/10 text-brand border-brand/30",
       icon: CheckCircle2,
       label: "Ready",
@@ -266,13 +266,13 @@ function StatusBadge({ status }: { status: DocumentItem["status"] }) {
       icon: RefreshCw,
       label: "Processing",
     },
-    error: {
+    failed: {
       cls: "bg-destructive/10 text-destructive border-destructive/30",
       icon: AlertCircle,
-      label: "Error",
+      label: "Failed",
     },
   } as const;
-  const c = (map as any)[status] ?? map.completed;
+  const c = (map as any)[status] ?? map.ready;
   const Icon = c.icon;
   return (
     <span

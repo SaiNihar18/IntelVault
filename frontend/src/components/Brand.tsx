@@ -18,18 +18,23 @@ export function Brand({
   const s = sizes[size];
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex flex-col group cursor-pointer", className)}>
       <div className="flex items-center gap-2">
-        <ShieldCheck className="text-brand" size={s.icon} strokeWidth={2.25} />
-        <span className={cn("font-semibold tracking-tight text-brand", s.text)}>
+        <ShieldCheck
+          className="text-brand transition-transform duration-500 ease-out group-hover:scale-115 group-hover:rotate-12"
+          size={s.icon}
+          strokeWidth={2.25}
+        />
+        <span className={cn("font-semibold tracking-tight text-brand transition-colors duration-300 group-hover:text-brand/95", s.text)}>
           IntelVault
         </span>
       </div>
       {showSubtitle && (
-        <span className="mt-1 text-xs text-muted-foreground pl-7">
+        <span className="mt-1 text-xs text-muted-foreground pl-7 transition-colors duration-300 group-hover:text-muted-foreground/80">
           Workspace Switcher
         </span>
       )}
     </div>
   );
 }
+

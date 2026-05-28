@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SharesShareTokenRouteImport } from './routes/shares.$shareToken'
 import { Route as AuthenticatedWorkspacesRouteImport } from './routes/_authenticated/workspaces'
+import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces.index'
 import { Route as AuthenticatedWorkspacesWorkspaceIdIndexRouteImport } from './routes/_authenticated/workspaces.$workspaceId.index'
 import { Route as AuthenticatedWorkspacesWorkspaceIdTabRouteImport } from './routes/_authenticated/workspaces.$workspaceId.$tab'
 
@@ -47,6 +48,12 @@ const AuthenticatedWorkspacesRoute = AuthenticatedWorkspacesRouteImport.update({
   path: '/workspaces',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedWorkspacesIndexRoute =
+  AuthenticatedWorkspacesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedWorkspacesRoute,
+  } as any)
 const AuthenticatedWorkspacesWorkspaceIdIndexRoute =
   AuthenticatedWorkspacesWorkspaceIdIndexRouteImport.update({
     id: '/$workspaceId/',
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/workspaces': typeof AuthenticatedWorkspacesRouteWithChildren
   '/shares/$shareToken': typeof SharesShareTokenRoute
+  '/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/workspaces/$workspaceId/$tab': typeof AuthenticatedWorkspacesWorkspaceIdTabRoute
   '/workspaces/$workspaceId/': typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
 }
@@ -73,8 +81,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/workspaces': typeof AuthenticatedWorkspacesRouteWithChildren
   '/shares/$shareToken': typeof SharesShareTokenRoute
+  '/workspaces': typeof AuthenticatedWorkspacesIndexRoute
   '/workspaces/$workspaceId/$tab': typeof AuthenticatedWorkspacesWorkspaceIdTabRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
 }
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/_authenticated/workspaces': typeof AuthenticatedWorkspacesRouteWithChildren
   '/shares/$shareToken': typeof SharesShareTokenRoute
+  '/_authenticated/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/_authenticated/workspaces/$workspaceId/$tab': typeof AuthenticatedWorkspacesWorkspaceIdTabRoute
   '/_authenticated/workspaces/$workspaceId/': typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
 }
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/workspaces'
     | '/shares/$shareToken'
+    | '/workspaces/'
     | '/workspaces/$workspaceId/$tab'
     | '/workspaces/$workspaceId/'
   fileRoutesByTo: FileRoutesByTo
@@ -104,8 +114,8 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
-    | '/workspaces'
     | '/shares/$shareToken'
+    | '/workspaces'
     | '/workspaces/$workspaceId/$tab'
     | '/workspaces/$workspaceId'
   id:
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/_authenticated/workspaces'
     | '/shares/$shareToken'
+    | '/_authenticated/workspaces/'
     | '/_authenticated/workspaces/$workspaceId/$tab'
     | '/_authenticated/workspaces/$workspaceId/'
   fileRoutesById: FileRoutesById
@@ -172,6 +183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/workspaces/': {
+      id: '/_authenticated/workspaces/'
+      path: '/'
+      fullPath: '/workspaces/'
+      preLoaderRoute: typeof AuthenticatedWorkspacesIndexRouteImport
+      parentRoute: typeof AuthenticatedWorkspacesRoute
+    }
     '/_authenticated/workspaces/$workspaceId/': {
       id: '/_authenticated/workspaces/$workspaceId/'
       path: '/$workspaceId'
@@ -190,12 +208,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedWorkspacesRouteChildren {
+  AuthenticatedWorkspacesIndexRoute: typeof AuthenticatedWorkspacesIndexRoute
   AuthenticatedWorkspacesWorkspaceIdTabRoute: typeof AuthenticatedWorkspacesWorkspaceIdTabRoute
   AuthenticatedWorkspacesWorkspaceIdIndexRoute: typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
 }
 
 const AuthenticatedWorkspacesRouteChildren: AuthenticatedWorkspacesRouteChildren =
   {
+    AuthenticatedWorkspacesIndexRoute: AuthenticatedWorkspacesIndexRoute,
     AuthenticatedWorkspacesWorkspaceIdTabRoute:
       AuthenticatedWorkspacesWorkspaceIdTabRoute,
     AuthenticatedWorkspacesWorkspaceIdIndexRoute:

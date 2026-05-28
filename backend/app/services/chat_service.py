@@ -76,6 +76,7 @@ async def ask_question(
     question: str,
     chat_session_id: UUID | None = None,
     debug_retrieval: bool = False,
+    document_ids: list[UUID] | None = None,
 ) -> ChatTurnResult:
     if chat_session_id is None:
         chat_session = await _create_chat_session(session, workspace_id=workspace_id, user=user, title=question)
@@ -102,6 +103,7 @@ async def ask_question(
         question=question,
         top_k=settings.RETRIEVAL_TOP_K,
         min_score=settings.RETRIEVAL_MIN_SCORE,
+        document_ids=document_ids,
     )
 
     context_blocks = [

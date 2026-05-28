@@ -103,6 +103,7 @@ export interface ChatRequest {
   question: string;
   chat_session_id?: string | null;
   debug_retrieval?: boolean;
+  document_ids?: string[] | null;
 }
 
 export interface ChatResponse {

@@ -94,7 +94,7 @@ export function SharesTab({ workspaceId }: { workspaceId: string }) {
         expires_in_hours: data.expires_in_hours,
         max_uses: data.max_uses ?? null,
       });
-      const url = response.share_url ?? `${window.location.origin}/shares/${response.share_token}`;
+      const url = `${window.location.origin}/shares/${response.share_token}`;
       try { await navigator.clipboard.writeText(url); } catch {}
       setLastShareUrl(url);
       toast.success("Share link created and copied");

@@ -81,7 +81,15 @@ async def retrieve_relevant_chunks(
         conditions.append(Document.id.in_(document_ids))
 
     result = await session.execute(
-        select(DocumentChunk, Document, DocumentVersion)
+        select(
+            DocumentChunk.id,
+            DocumentChunk.embedding,
+            DocumentChunk.content,
+            DocumentChunk.chunk_metadata,
+            Document.id.label("document_id"),
+            Document.filename.label("document_filename"),
+            DocumentVersion.version_number.label("version_number"),
+        )
         .join(DocumentVersion, DocumentChunk.document_version_id == DocumentVersion.id)
         .join(Document, DocumentChunk.document_id == Document.id)
         .join(
@@ -101,29 +109,38 @@ async def retrieve_relevant_chunks(
     lexical_weight = settings.RETRIEVAL_LEXICAL_WEIGHT
 
     query_embedding = get_embedding_provider().embed_texts([question])[0]
+    query_norm = math.sqrt(sum(a * a for a in query_embedding))
     scored: list[RetrievedChunk] = []
-    for chunk, document, version in rows:
-        chunk_metadata = dict(chunk.chunk_metadata or {})
-        similarity = _cosine_similarity(query_embedding, list(chunk.embedding))
-        lexical_score = _lexical_overlap_score(question, chunk.content)
+
+    for chunk_id, embedding, content, chunk_metadata, doc_id, doc_filename, version_number in rows:
+        metadata = dict(chunk_metadata or {})
+        
+        # Inlined cosine similarity using precomputed query norm for speed
+        dot = sum(a * b for a, b in zip(query_embedding, embedding))
+        right_norm = math.sqrt(sum(b * b for b in embedding))
+        similarity = (dot / (query_norm * right_norm)) if (query_norm > 0 and right_norm > 0) else 0.0
+
+        lexical_score = _lexical_overlap_score(question, content)
         hybrid_score = ((1.0 - lexical_weight) * similarity) + (lexical_weight * lexical_score)
-        page_number = chunk_metadata.get("page_number")
-        source_type = chunk_metadata.get("source_type")
+        
         if hybrid_score < effective_min_score:
             continue
+
+        page_number = metadata.get("page_number")
+        source_type = metadata.get("source_type")
         scored.append(
             RetrievedChunk(
-                chunk_id=chunk.id,
-                document_id=document.id,
-                document_filename=document.filename,
-                version_number=version.version_number,
+                chunk_id=chunk_id,
+                document_id=doc_id,
+                document_filename=doc_filename,
+                version_number=version_number,
                 page_number=int(page_number) if page_number is not None else None,
                 source_type=str(source_type) if source_type is not None else None,
                 score=hybrid_score,
                 vector_score=similarity,
                 lexical_score=lexical_score,
-                content=chunk.content,
-                chunk_metadata=chunk_metadata,
+                content=content,
+                chunk_metadata=metadata,
             )
         )
 

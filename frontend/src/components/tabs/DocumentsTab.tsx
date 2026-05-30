@@ -8,9 +8,17 @@ import {
   AlertCircle,
   X,
   Info,
+  Trash2,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useDocuments, useUploadDocument, type DocumentItem } from "@/hooks/api";
+import {
+  useDocuments,
+  useUploadDocument,
+  useDeleteDocument,
+  downloadDocument,
+  type DocumentItem,
+} from "@/hooks/api";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -38,6 +46,7 @@ function formatDate(s: string) {
 export function DocumentsTab({ workspaceId }: { workspaceId: string }) {
   const { data: documents, isLoading, error, refetch } = useDocuments(workspaceId);
   const upload = useUploadDocument(workspaceId);
+  const deleteMutation = useDeleteDocument(workspaceId);
   const fileInput = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
   const [query, setQuery] = useState("");
@@ -224,22 +233,49 @@ export function DocumentsTab({ workspaceId }: { workspaceId: string }) {
               <DetailRow label="Checksum" value={<code className="break-all font-mono text-xs text-muted-foreground">{selectedDocument.checksum_sha256}</code>} />
               <DetailRow label="Uploaded" value={formatDate(selectedDocument.created_at)} />
               <DetailRow label="Updated" value={formatDate(selectedDocument.updated_at)} />
-              <div className="rounded-lg border border-border bg-background/60 p-3 text-xs text-muted-foreground">
-                <div className="flex items-start gap-2">
-                  <Info size={14} className="mt-0.5 shrink-0" />
-                  <p>
-                    The backend currently supports upload and metadata retrieval only. Document deletion and direct download are not exposed.
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between border-t border-border pt-4 mt-6">
                 <button
                   type="button"
-                  onClick={() => setSelectedDocument(null)}
-                  className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-foreground hover:border-brand/60 transition-base"
+                  disabled={deleteMutation.isPending}
+                  onClick={async () => {
+                    if (confirm(`Are you sure you want to delete ${selectedDocument.filename}?`)) {
+                      try {
+                        await deleteMutation.mutateAsync(selectedDocument.id);
+                        toast.success("Document deleted successfully");
+                        setSelectedDocument(null);
+                      } catch (err: any) {
+                        toast.error(err?.message || "Failed to delete document");
+                      }
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-md bg-destructive/10 text-destructive border border-destructive/20 px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:bg-destructive/20 disabled:opacity-50 transition-base cursor-pointer"
                 >
-                  <X size={14} /> Close
+                  <Trash2 size={14} /> Delete
                 </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        toast.info("Starting download...");
+                        await downloadDocument(workspaceId, selectedDocument);
+                        toast.success("Download started");
+                      } catch (err: any) {
+                        toast.error(err?.message || "Failed to download document");
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-md bg-brand text-brand-foreground px-3 py-2 text-xs font-semibold uppercase tracking-wide hover:opacity-90 transition-base cursor-pointer"
+                  >
+                    <Download size={14} /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDocument(null)}
+                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs text-foreground hover:border-brand/60 transition-base cursor-pointer"
+                  >
+                    <X size={14} /> Close
+                  </button>
+                </div>
               </div>
             </div>
           )}

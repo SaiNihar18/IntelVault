@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -11,6 +11,8 @@ from app.core.errors import IntelVaultError
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.user import User
+from app.models.workspace import Workspace
+from app.models.document import Document
 from app.services import audit_service
 from app.services.llm_service import get_chat_completion_provider
 from app.services.retrieval_service import RetrievedChunk, retrieve_relevant_chunks
@@ -97,20 +99,57 @@ async def ask_question(
     session.add(user_message)
     await session.flush()
 
-    sources = await retrieve_relevant_chunks(
-        session,
-        workspace_id=workspace_id,
-        question=question,
-        top_k=settings.RETRIEVAL_TOP_K,
-        min_score=settings.RETRIEVAL_MIN_SCORE,
-        document_ids=document_ids,
+    # Fetch workspace metadata
+    workspace_result = await session.execute(
+        select(Workspace).where(Workspace.id == workspace_id)
+    )
+    db_workspace = workspace_result.scalar_one_or_none()
+    workspace_name = db_workspace.name if db_workspace else "Unknown"
+
+    doc_count_result = await session.execute(
+        select(func.count(Document.id)).where(Document.workspace_id == workspace_id)
+    )
+    document_count = doc_count_result.scalar() or 0
+
+    # Greeting detection to skip retrieval entirely
+    clean_q = question.lower().strip().rstrip("?.!")
+    is_greeting = clean_q in {
+        "hi", "hello", "hey", "hey there", "yo", "greetings", 
+        "good morning", "good afternoon", "good evening"
+    }
+
+    if is_greeting:
+        sources = []
+        context_blocks = []
+    else:
+        sources = await retrieve_relevant_chunks(
+            session,
+            workspace_id=workspace_id,
+            question=question,
+            top_k=settings.RETRIEVAL_TOP_K,
+            min_score=settings.RETRIEVAL_MIN_SCORE,
+            document_ids=document_ids,
+        )
+        context_blocks = [
+            f"Document: {source.document_filename}\nPage: {source.page_number or 'n/a'}\nContent: {source.content}"
+            for source in sources
+        ]
+
+    answer = get_chat_completion_provider().generate_answer(
+        question, 
+        context_blocks,
+        workspace_name=workspace_name,
+        document_count=document_count
     )
 
-    context_blocks = [
-        f"Document: {source.document_filename}\nPage: {source.page_number or 'n/a'}\nContent: {source.content}"
-        for source in sources
-    ]
-    answer = get_chat_completion_provider().generate_answer(question, context_blocks)
+    # Post-process response to clear citations if answered out-of-context or is greeting
+    if "[no_context_used]" in answer.lower():
+        sources = []
+        import re
+        answer = re.sub(r"\[NO_CONTEXT_USED\]", "", answer, flags=re.IGNORECASE).strip()
+    
+    if "not available within the current workspace documents" in answer.lower():
+        sources = []
 
     retrieval_debug: dict[str, object] | None = None
     if debug_retrieval:

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, require_workspace_permission
@@ -55,4 +57,40 @@ async def get_document(
         session,
         workspace_id,
         document_id,
+    )
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    workspace_id: UUID,
+    document_id: UUID,
+    _: WorkspaceMembership = Depends(
+        require_workspace_permission(Permission.document_upload)
+    ),
+    session: AsyncSession = Depends(get_db),
+) -> None:
+    await document_service.delete_workspace_document(session, workspace_id, document_id)
+
+
+@router.get("/{document_id}/download")
+async def download_document(
+    workspace_id: UUID,
+    document_id: UUID,
+    _: WorkspaceMembership = Depends(
+        require_workspace_permission(Permission.document_download)
+    ),
+    session: AsyncSession = Depends(get_db),
+) -> FileResponse:
+    document = await document_service.get_workspace_document(session, workspace_id, document_id)
+    if not document.storage_path:
+        raise document_service.DocumentNotFoundError()
+    
+    path = Path(document.storage_path)
+    if not path.exists():
+        raise document_service.DocumentNotFoundError()
+        
+    return FileResponse(
+        path=path,
+        filename=document.filename,
+        media_type=document.content_type or "application/octet-stream",
     )

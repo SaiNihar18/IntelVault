@@ -11,8 +11,11 @@ from app.core.config import settings
 def _create_engine() -> AsyncEngine:
     return create_async_engine(
         settings.DATABASE_URL,
-        echo=settings.DEBUG,
+        echo=False,
         pool_pre_ping=True,
+        pool_size=20,
+        max_overflow=10,
+        pool_recycle=1800,
     )
 
 

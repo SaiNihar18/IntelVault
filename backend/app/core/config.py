@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         description="Async SQLAlchemy URL, e.g. postgresql+asyncpg://user:pass@host/db",
     )
 
-    CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"])
+    CORS_ORIGINS: str | list[str] = Field(default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"])
 
     JWT_SECRET: str = Field(
         ...,
@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     GEMINI_MAX_RETRIES: int = 3
     GEMINI_RETRY_BASE_DELAY_SECONDS: float = 1.0
     GEMINI_REQUEST_TIMEOUT_SECONDS: float = 60.0
+    GROQ_API_KEY: str | None = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_API_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_MAX_RETRIES: int = 3
+    GROQ_RETRY_BASE_DELAY_SECONDS: float = 1.0
+    GROQ_REQUEST_TIMEOUT_SECONDS: float = 60.0
     PUBLIC_API_BASE_URL: str = "http://127.0.0.1:8000"
     RETRIEVAL_TOP_K: int = 5
     RETRIEVAL_MIN_SCORE: float = 0.02
@@ -134,6 +140,27 @@ class Settings(BaseSettings):
     def validate_gemini_request_timeout_seconds(cls, v: float) -> float:
         if v <= 0:
             raise ValueError("GEMINI_REQUEST_TIMEOUT_SECONDS must be > 0")
+        return v
+
+    @field_validator("GROQ_MAX_RETRIES")
+    @classmethod
+    def validate_groq_max_retries(cls, v: int) -> int:
+        if v < 0 or v > 10:
+            raise ValueError("GROQ_MAX_RETRIES must be between 0 and 10")
+        return v
+
+    @field_validator("GROQ_RETRY_BASE_DELAY_SECONDS")
+    @classmethod
+    def validate_groq_retry_base_delay_seconds(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("GROQ_RETRY_BASE_DELAY_SECONDS must be >= 0")
+        return v
+
+    @field_validator("GROQ_REQUEST_TIMEOUT_SECONDS")
+    @classmethod
+    def validate_groq_request_timeout_seconds(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("GROQ_REQUEST_TIMEOUT_SECONDS must be > 0")
         return v
 
     @field_validator("RETRIEVAL_TOP_K")

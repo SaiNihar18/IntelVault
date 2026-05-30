@@ -235,17 +235,30 @@ export function useUploadDocument(workspaceId: string) {
   });
 }
 
-// Legacy compatibility only. The backend does not currently expose document delete or download endpoints.
-export function useDeleteDocument(_workspaceId: string) {
+export function useDeleteDocument(workspaceId: string) {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (_id: string) => {
-      throw new Error("Document deletion is not supported by this backend");
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/workspaces/${workspaceId}/documents/${id}`);
     },
+    onSuccess: () => qc.invalidateQueries({ queryKey: docKeys.list(workspaceId) }),
   });
 }
 
-export async function downloadDocument(_workspaceId: string, doc: DocumentItem) {
-  throw new Error(`Direct document download is not supported for ${doc.filename}`);
+export async function downloadDocument(workspaceId: string, doc: DocumentItem) {
+  const response = await apiClient.get(
+    `/workspaces/${workspaceId}/documents/${doc.id}/download`,
+    { responseType: "blob" }
+  );
+  const blob = new Blob([response.data], { type: doc.content_type || "application/octet-stream" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = doc.filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
 /* ============================== Chat =============================== */

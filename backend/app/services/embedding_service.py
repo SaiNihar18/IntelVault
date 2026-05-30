@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import time
 from abc import ABC, abstractmethod
 from urllib import error, request
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingProvider(ABC):
@@ -47,7 +50,85 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         self.fallback = DeterministicEmbeddingProvider(dimension)
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        return [self._embed_one(text) for text in texts]
+        if not texts:
+            return []
+        
+        batch_size = 50
+        all_embeddings: list[list[float]] = []
+        
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            try:
+                embeddings = self._embed_batch(batch)
+                all_embeddings.extend(embeddings)
+            except Exception as e:
+                logger.warning(f"Batch embedding failed: {e}. Falling back to sequential embedding.")
+                for text in batch:
+                    all_embeddings.append(self._embed_one(text))
+                    
+        return all_embeddings
+
+    def _embed_batch(self, batch: list[str]) -> list[list[float]]:
+        payload = {
+            "requests": [
+                {
+                    "model": "models/gemini-embedding-2",
+                    "content": {
+                        "parts": [{"text": text}]
+                    },
+                    "outputDimensionality": self.dimension
+                }
+                for text in batch
+            ]
+        }
+        data = json.dumps(payload).encode("utf-8")
+        url = f"{self.base_url}/models/gemini-embedding-2:batchEmbedContents?key={self.api_key}"
+        req = request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        max_attempts = max(1, settings.GEMINI_MAX_RETRIES + 1)
+
+        for attempt in range(max_attempts):
+            try:
+                with request.urlopen(req, timeout=settings.GEMINI_REQUEST_TIMEOUT_SECONDS) as resp:
+                    body = json.loads(resp.read().decode("utf-8"))
+                break
+            except error.HTTPError as exc:
+                if exc.code == 429 or exc.code >= 500:
+                    if attempt >= max_attempts - 1:
+                        raise exc
+                    retry_after = exc.headers.get("Retry-After")
+                    try:
+                        delay = max(0.1, float(retry_after)) if retry_after else settings.GEMINI_RETRY_BASE_DELAY_SECONDS * (2**attempt)
+                    except (ValueError, TypeError):
+                        delay = settings.GEMINI_RETRY_BASE_DELAY_SECONDS * (2**attempt)
+                    time.sleep(delay)
+                    continue
+                else:
+                    raise exc
+            except Exception as exc:
+                if attempt >= max_attempts - 1:
+                    raise exc
+                time.sleep(settings.GEMINI_RETRY_BASE_DELAY_SECONDS * (2**attempt))
+                continue
+        else:
+            raise RuntimeError("Batch embedding request failed after retries")
+
+        embeddings_list = body.get("embeddings") or []
+        if len(embeddings_list) != len(batch):
+            raise ValueError(f"Expected {len(batch)} embeddings, got {len(embeddings_list)}")
+            
+        results: list[list[float]] = []
+        for emb in embeddings_list:
+            values = emb.get("values")
+            if not values or len(values) != self.dimension:
+                raise ValueError("Invalid embedding dimension or values in batch response")
+            results.append([float(v) for v in values])
+            
+        return results
 
     def _embed_one(self, text: str) -> list[float]:
         payload = {
@@ -104,7 +185,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
 
 def get_embedding_provider() -> EmbeddingProvider:
-    if settings.LLM_PROVIDER.lower() == "gemini" and settings.GEMINI_API_KEY:
+    if settings.GEMINI_API_KEY:
         return GeminiEmbeddingProvider(
             api_key=settings.GEMINI_API_KEY,
             base_url=settings.GEMINI_API_BASE_URL,

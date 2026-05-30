@@ -99,3 +99,23 @@ async def get_workspace_document(
     if document is None:
         raise DocumentNotFoundError()
     return document
+
+
+async def delete_workspace_document(
+    session: AsyncSession,
+    workspace_id: UUID,
+    document_id: UUID,
+) -> None:
+    document = await get_workspace_document(session, workspace_id, document_id)
+    if document.storage_path:
+        try:
+            path = Path(document.storage_path)
+            if path.exists():
+                path.unlink()
+            parent_dir = path.parent
+            if parent_dir.exists() and not any(parent_dir.iterdir()):
+                parent_dir.rmdir()
+        except Exception:
+            pass
+    await session.delete(document)
+    await session.commit()

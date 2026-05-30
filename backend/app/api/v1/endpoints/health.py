@@ -21,10 +21,10 @@ async def health() -> dict[str, str]:
 async def ready(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
     try:
         await db.execute(text("SELECT 1"))
-    except Exception:
+    except Exception as e:
         logger.exception("readiness_check_failed")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database unavailable",
+            detail=f"Database unavailable: {str(e)}",
         )
     return {"status": "ready", "database": "connected"}

@@ -306,8 +306,36 @@ export function useSendChatMessage(workspaceId: string) {
       );
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       qc.invalidateQueries({ queryKey: chatKeys.sessions(workspaceId) });
+      qc.setQueryData(
+        chatKeys.messages(workspaceId, data.chat_session_id),
+        (old: ChatMessage[] | undefined) => {
+          const existing = old || [];
+          if (existing.some((m) => m.id === data.user_message_id)) {
+            return existing;
+          }
+          return [
+            ...existing,
+            {
+              id: data.user_message_id,
+              chat_session_id: data.chat_session_id,
+              role: "user",
+              content: variables.question,
+              created_at: new Date().toISOString(),
+              sources: null,
+            },
+            {
+              id: data.assistant_message_id,
+              chat_session_id: data.chat_session_id,
+              role: "assistant",
+              content: data.answer,
+              created_at: new Date().toISOString(),
+              sources: data.sources || [],
+            },
+          ];
+        }
+      );
       qc.invalidateQueries({
         queryKey: chatKeys.messages(workspaceId, data.chat_session_id),
       });

@@ -1,154 +1,180 @@
 # 🧠 IntelVault
 
-![IntelVault Banner](https://via.placeholder.com/1200x300.png?text=IntelVault+-+AI+Powered+Document+Intelligence)
+**IntelVault** is a full-stack, AI-powered document intelligence and chat platform. It enables individuals and teams to securely organize workspaces, upload complex documents, and interact with a context-aware AI chatbot that retrieves precise answers directly from your files using Retrieval-Augmented Generation (RAG).
 
-**IntelVault** is a full-stack, AI-powered document intelligence and chat application. It allows individuals and teams to securely manage workspaces, upload complex documents, and seamlessly converse with an AI chatbot that retrieves accurate, context-aware information directly from your files.
+Whether you're analyzing legal contracts, parsing research papers, or exploring corporate wikis — IntelVault turns static documents into an interactive, searchable knowledge base.
 
-Whether you're analyzing legal contracts, parsing research papers, or exploring corporate wikis, IntelVault turns static documents into an interactive knowledge base.
+> **🌐 Live Demo:** [https://intelvault.intelvault.workers.dev](https://intelvault.intelvault.workers.dev/login)
 
 ---
 
 ## ✨ Key Features
-- **📂 Workspace Management:** Organize your documents into isolated workspaces.
-- **📄 Smart Document Processing:** Upload and automatically process PDFs and text documents into searchable embeddings.
-- **🤖 Context-Aware AI Chat:** Ask questions and get precise answers powered by state-of-the-art LLMs (Gemini, Groq) using Retrieval-Augmented Generation (RAG).
-- **⚡ Blazing Fast UI:** A highly responsive, modern interface built on React, TypeScript, and Vite.
-- **🔒 Secure & Scalable:** A robust FastAPI backend backed by PostgreSQL and Supabase.
+
+- **📂 Workspace Management** — Organize documents into isolated, access-controlled workspaces.
+- **📄 Smart Document Processing** — Upload PDFs and text files that are automatically chunked, embedded, and indexed for semantic search.
+- **🤖 Context-Aware AI Chat** — Ask questions and get precise answers powered by Groq's LLaMA model using RAG over your documents.
+- **🔗 Document Sharing** — Generate expiring, token-based share links for individual documents.
+- **📋 Audit Logs** — Track all workspace activity with a built-in event log.
+- **⚡ Blazing Fast UI** — A highly responsive, modern interface built on TanStack Start and React 19.
+- **🔒 Secure & Scalable** — JWT-based authentication, bcrypt password hashing, and a robust FastAPI backend with async PostgreSQL.
 
 ---
 
 ## 🛠️ Technology Stack
 
-**Frontend**
-- **Framework:** React 18 with TypeScript
-- **Build Tool:** Vite
-- **Styling:** Tailwind CSS
-- **State & Data Fetching:** React Query / Context API
+### Frontend
+| Technology | Purpose |
+|---|---|
+| React 19 + TypeScript | UI Framework |
+| TanStack Start | SSR Framework & Routing |
+| TanStack Query | Data Fetching & Caching |
+| Tailwind CSS + Radix UI | Styling & Components |
+| Vite | Build Tool |
+| Cloudflare Workers | Hosting & Edge Runtime |
 
-**Backend**
-- **Framework:** FastAPI (Python 3.11+)
-- **Database:** PostgreSQL (hosted via Supabase)
-- **ORM:** SQLAlchemy with AsyncPG
-- **AI Integration:** Google Gemini (Embeddings & Vision), Groq (Fast Chat Completions)
+### Backend
+| Technology | Purpose |
+|---|---|
+| FastAPI (Python 3.11) | REST API Framework |
+| SQLAlchemy + AsyncPG | Async ORM & PostgreSQL Driver |
+| Alembic | Database Migrations |
+| Supabase (PostgreSQL) | Hosted Database |
+| Google Gemini | Text Embeddings |
+| Groq (LLaMA 3.3 70B) | Chat Completions |
+| PyJWT + bcrypt | Authentication |
+| Render | Backend Hosting |
+
+---
+
+## 🌍 Deployments
+
+| Service | URL |
+|---|---|
+| **Frontend** | [https://intelvault.intelvault.workers.dev](https://intelvault.intelvault.workers.dev/login) |
+| **Backend API** | [https://intelvault.onrender.com](https://intelvault.onrender.com) |
+| **API Health Check** | [https://intelvault.onrender.com/api/v1/health](https://intelvault.onrender.com/api/v1/health) |
 
 ---
 
 ## 🚀 Local Development Setup
 
+### Prerequisites
+- Python 3.11+
+- Node.js 18+ and npm
+- A PostgreSQL database (or Supabase account)
+- Google Gemini API Key
+- Groq API Key
+
+---
+
 ### 1. Backend Setup
 
-1. **Navigate to the backend directory:**
-   ```bash
-   cd backend
-   ```
+```bash
+cd backend
+```
 
-2. **Create and activate a virtual environment:**
-   ```bash
-   # Windows
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   
-   # macOS/Linux
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+**Create and activate a virtual environment:**
+```bash
+# Windows
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# macOS/Linux
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
-4. **Environment Variables:**
-   Create a `.env` file in the `backend/` directory by copying `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
-   **Update the `.env` file with your credentials:**
-   ```ini
-   # Use your Supabase PostgreSQL connection string
-   DATABASE_URL=postgresql+asyncpg://postgres:YourEncodedPassword@db.your-supabase-url.co:5432/postgres
-   
-   GEMINI_API_KEY=your_gemini_api_key_here
-   GROQ_API_KEY=your_groq_api_key_here
-   LLM_PROVIDER=groq
-   
-   # Required for Security
-   JWT_SECRET=your-very-long-secret-key-that-is-at-least-32-chars-long
-   ```
+**Install dependencies:**
+```bash
+pip install -r requirements.txt
+```
 
-5. **Start the backend server:**
-   ```bash
-   uvicorn app.main:app --reload --port 8000
-   ```
-   *The API will be running at `http://localhost:8000`*
+**Set up environment variables** — copy `.env.example` to `.env` and fill in your values:
+```bash
+cp .env.example .env
+```
+
+Key variables to set in `backend/.env`:
+```ini
+# PostgreSQL connection string (use asyncpg driver)
+DATABASE_URL=postgresql+asyncpg://postgres:YourPassword@db.your-project.supabase.co:5432/postgres
+
+# API Keys
+GEMINI_API_KEY=your_gemini_api_key
+GROQ_API_KEY=your_groq_api_key
+LLM_PROVIDER=groq
+
+# JWT Security (must be at least 32 characters)
+JWT_SECRET=your-very-long-secret-key-at-least-32-chars
+
+# CORS (your frontend URL)
+CORS_ORIGINS=http://localhost:5173
+```
+
+**Start the backend:**
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+*API running at `http://localhost:8000` — docs at `http://localhost:8000/docs`*
 
 ---
 
 ### 2. Frontend Setup
 
-1. **Navigate to the frontend directory:**
-   ```bash
-   cd frontend
-   ```
+```bash
+cd frontend
+npm install
+```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+**Set up environment variables** — create `frontend/.env`:
+```ini
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
 
-3. **Environment Variables:**
-   Create a `.env` file in the `frontend/` directory:
-   ```ini
-   VITE_API_URL=http://localhost:8000
-   ```
-
-4. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
-   *The frontend will be running at `http://localhost:5173`*
+**Start the development server:**
+```bash
+npm run dev
+```
+*Frontend running at `http://localhost:5173`*
 
 ---
 
-## 🌍 Deployment Guide
+## ☁️ Production Deployment
 
-### Deploying the Backend (Render)
-Render is an excellent platform for hosting FastAPI web services.
+### Backend — Render
 
-1. Log in to [Render](https://render.com) and click **New > Web Service**.
-2. Connect your GitHub repository and select `IntelVault`.
-3. **Configuration:**
-   - **Name:** intelvault-api
-   - **Root Directory:** `backend` (⚠️ Important)
-   - **Environment:** `Python 3`
+1. Log in to [Render](https://render.com) → **New → Web Service**.
+2. Connect your GitHub repository.
+3. Configure:
+   - **Root Directory:** `backend`
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. **Environment Variables (Advanced):**
-   - `DATABASE_URL` (Your Supabase connection string)
-   - `GEMINI_API_KEY`
-   - `GROQ_API_KEY`
-   - `LLM_PROVIDER` (Set to `groq`)
-   - `JWT_SECRET` (A secure random string > 32 characters)
-   - `CORS_ORIGINS` (Your Vercel URL, e.g., `https://intelvault-web.vercel.app`)
-   - `PYTHON_VERSION` (Set to `3.11.0`)
-5. Click **Create Web Service**.
+4. Add environment variables:
+   - `DATABASE_URL` — Your Supabase pooler connection string (`postgresql+asyncpg://...` on port `6543`)
+   - `GEMINI_API_KEY`, `GROQ_API_KEY`, `LLM_PROVIDER=groq`
+   - `JWT_SECRET` — Long random string (32+ chars)
+   - `CORS_ORIGINS` — Your frontend URL (e.g. `https://intelvault.intelvault.workers.dev`)
+   - `PYTHON_VERSION=3.11.0`
+   - `PYTHONUNBUFFERED=1`
+
+> ⚠️ **Supabase Note:** Use the **Pooler** connection string (port `6543`), not the direct connection (port `5432`). Render's network does not support IPv6, which Supabase's direct connections require.
 
 ---
 
-### Deploying the Frontend (Vercel)
-Vercel is optimized for Vite applications.
+### Frontend — Cloudflare Workers
 
-1. Log in to [Vercel](https://vercel.com) and click **Add New > Project**.
-2. Import your `IntelVault` GitHub repository.
-3. **Configuration:**
-   - **Framework Preset:** Vite
-   - **Root Directory:** `frontend` (⚠️ Important)
-4. **Environment Variables:**
-   - Name: `VITE_API_URL`
-   - Value: `https://intelvault-api.onrender.com` (Your Render URL)
-5. Click **Deploy**. Vercel will build and provide a live URL.
+1. Log in to [Cloudflare](https://dash.cloudflare.com) → **Workers & Pages → Create**.
+2. Connect your GitHub repository.
+3. Configure:
+   - **Root Directory:** `frontend`
+   - **Build Command:** `npm run build`
+   - **Build Output Directory:** `dist/client`
+   - **Worker Entry Point:** `src/server.ts`
+4. Add environment variable:
+   - `VITE_API_BASE_URL` — Your Render backend URL with prefix: `https://intelvault.onrender.com/api/v1`
 
 ---
 
 ## 📄 License
+
 This project is licensed under the MIT License.

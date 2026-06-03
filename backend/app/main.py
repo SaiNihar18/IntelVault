@@ -63,6 +63,18 @@ def create_app() -> FastAPI:
             content={"detail": exc.message},
         )
 
+    @app.exception_handler(Exception)
+    async def global_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Global unhandled exception: {exc}\n{tb}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": str(exc), "traceback": tb},
+        )
+
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
     return app

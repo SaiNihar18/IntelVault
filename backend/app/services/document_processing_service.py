@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -38,7 +39,8 @@ async def process_document(document_id: UUID) -> None:
 
         try:
             logger.info("document_processing_started", extra={"document_id": str(document.id)})
-            parsed = parse_document(
+            parsed = await asyncio.to_thread(
+                parse_document,
                 file_path=document.storage_path,
                 filename=document.filename,
             )
@@ -70,7 +72,8 @@ async def process_document(document_id: UUID) -> None:
             session.add(version)
             await session.flush()
 
-            embeddings = get_embedding_provider().embed_texts(
+            embeddings = await asyncio.to_thread(
+                get_embedding_provider().embed_texts,
                 [candidate.content for candidate in candidates]
             )
             for idx, (candidate, embedding) in enumerate(zip(candidates, embeddings)):

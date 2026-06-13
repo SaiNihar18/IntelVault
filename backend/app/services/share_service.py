@@ -153,6 +153,7 @@ async def resolve_share_token(
     session: AsyncSession,
     *,
     share_token: str,
+    increment_uses: bool = True,
     access_event_type: str = "share_link.accessed",
 ) -> Document:
     token_hash = _hash_share_token(share_token)
@@ -177,20 +178,21 @@ async def resolve_share_token(
     if document is None:
         raise DocumentNotFoundError()
 
-    link.use_count += 1
-    link.last_used_at = now
-    await audit_service.log_event(
-        session,
-        workspace_id=link.workspace_id,
-        event_type=access_event_type,
-        actor_user_id=None,
-        document_id=link.document_id,
-        event_metadata={
-            "share_link_id": str(link.id),
-            "use_count": link.use_count,
-        },
-    )
-    await session.commit()
+    if increment_uses:
+        link.use_count += 1
+        link.last_used_at = now
+        await audit_service.log_event(
+            session,
+            workspace_id=link.workspace_id,
+            event_type=access_event_type,
+            actor_user_id=None,
+            document_id=link.document_id,
+            event_metadata={
+                "share_link_id": str(link.id),
+                "use_count": link.use_count,
+            },
+        )
+        await session.commit()
     return document
 
 

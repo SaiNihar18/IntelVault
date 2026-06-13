@@ -88,7 +88,9 @@ async def access_shared_document(
     share_token: str,
     session: AsyncSession = Depends(get_db),
 ) -> SharedDocumentAccessResponse:
-    document = await share_service.resolve_share_token(session, share_token=share_token)
+    document = await share_service.resolve_share_token(
+        session, share_token=share_token, increment_uses=False
+    )
     return SharedDocumentAccessResponse(document=document)
 
 

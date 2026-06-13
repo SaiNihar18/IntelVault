@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -56,9 +57,10 @@ async def register(session: AsyncSession, email: str, password: str) -> TokenPai
     if await get_user_by_email(session, email_norm):
         raise EmailAlreadyRegisteredError()
     try:
+        hashed_password = await asyncio.to_thread(security.hash_password, password)
         user = User(
             email=email_norm,
-            hashed_password=security.hash_password(password),
+            hashed_password=hashed_password,
         )
         session.add(user)
         await session.flush()
@@ -73,7 +75,12 @@ async def register(session: AsyncSession, email: str, password: str) -> TokenPai
 async def login(session: AsyncSession, email: str, password: str) -> TokenPair:
     email_norm = email.lower().strip()
     user = await get_user_by_email(session, email_norm)
-    if user is None or not security.verify_password(password, user.hashed_password):
+    
+    is_valid = False
+    if user is not None:
+        is_valid = await asyncio.to_thread(security.verify_password, password, user.hashed_password)
+        
+    if not user or not is_valid:
         raise InvalidCredentialsError()
     if not user.is_active:
         raise InactiveUserError()

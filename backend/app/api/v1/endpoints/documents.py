@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, require_workspace_permission
 from app.core.permissions import Permission
+from app.core import storage
 from app.models.user import User
 from app.models.workspace_membership import WorkspaceMembership
 from app.schemas.document import DocumentPublic, DocumentUploadResponse
@@ -80,17 +80,17 @@ async def download_document(
         require_workspace_permission(Permission.document_download)
     ),
     session: AsyncSession = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     document = await document_service.get_workspace_document(session, workspace_id, document_id)
     if not document.storage_path:
         raise document_service.DocumentNotFoundError()
-    
-    path = Path(document.storage_path)
-    if not path.exists():
-        raise document_service.DocumentNotFoundError()
-        
-    return FileResponse(
-        path=path,
-        filename=document.filename,
+
+    file_bytes = storage.read_file(document.storage_path)
+    return Response(
+        content=file_bytes,
         media_type=document.content_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{document.filename}"',
+        },
     )
+

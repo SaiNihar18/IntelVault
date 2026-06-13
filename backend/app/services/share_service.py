@@ -3,13 +3,13 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core import storage
 from app.core.errors import ShareLinkInvalidError, ShareLinkNotFoundError, SharedDocumentFileNotFoundError
 from app.models.document import Document
 from app.models.document_share_link import DocumentShareLink
@@ -200,7 +200,7 @@ async def resolve_share_token_for_download(
     session: AsyncSession,
     *,
     share_token: str,
-) -> tuple[Document, Path]:
+) -> tuple[Document, str]:
     token_hash = _hash_share_token(share_token)
     result = await session.execute(
         select(DocumentShareLink).where(DocumentShareLink.token_hash == token_hash)
@@ -215,10 +215,11 @@ async def resolve_share_token_for_download(
         access_event_type="share_link.downloaded",
     )
     if link.encrypted_file_path:
-        file_path = Path(link.encrypted_file_path)
+        file_path = link.encrypted_file_path
     else:
-        file_path = Path(document.storage_path)
+        file_path = document.storage_path
 
-    if not file_path.is_file():
+    if not storage.file_exists(file_path):
         raise SharedDocumentFileNotFoundError()
     return document, file_path
+

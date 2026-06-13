@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pathlib import Path
 from fastapi import APIRouter, Depends, status, File, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, require_workspace_permission
-from app.core.config import settings
+from app.core import storage
 from app.core.errors import ShareLinkNotFoundError
 from app.core.permissions import Permission
 from app.models.document_share_link import DocumentShareLink
@@ -109,19 +108,12 @@ async def upload_encrypted_share_file(
     if link is None:
         raise ShareLinkNotFoundError()
 
-    storage_root = Path(settings.FILE_STORAGE_ROOT)
-    target_dir = storage_root / "shares" / str(share_link_id)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target_path = target_dir / "encrypted_payload"
+    # Read uploaded bytes and store via the unified storage layer.
+    file_bytes = await file.read()
+    relative_key = f"shares/{share_link_id}/encrypted_payload"
+    stored_path = storage.store_file(relative_key, file_bytes)
 
-    with open(target_path, "wb") as f:
-        while True:
-            chunk = await file.read(65536)
-            if not chunk:
-                break
-            f.write(chunk)
-
-    link.encrypted_file_path = str(target_path)
+    link.encrypted_file_path = stored_path
     await session.commit()
     await session.refresh(link)
 
@@ -143,13 +135,16 @@ async def access_shared_document(
 async def download_shared_document(
     share_token: str,
     session: AsyncSession = Depends(get_db),
-) -> FileResponse:
-    document, file_path = await share_service.resolve_share_token_for_download(
+) -> Response:
+    document, storage_path = await share_service.resolve_share_token_for_download(
         session,
         share_token=share_token,
     )
-    return FileResponse(
-        path=file_path,
+    file_bytes = storage.read_file(storage_path)
+    return Response(
+        content=file_bytes,
         media_type=document.content_type or "application/octet-stream",
-        filename=document.filename,
+        headers={
+            "Content-Disposition": f'attachment; filename="{document.filename}"',
+        },
     )

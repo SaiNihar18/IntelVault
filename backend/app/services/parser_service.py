@@ -28,8 +28,11 @@ class ParsedDocument:
     metadata: dict[str, object]
 
 
-def _parse_pdf(file_path: str) -> ParsedDocument:
-    doc = fitz.open(file_path)
+def _parse_pdf(file_path: str, *, file_bytes: bytes | None = None) -> ParsedDocument:
+    if file_bytes is not None:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+    else:
+        doc = fitz.open(file_path)
     segments: list[ParsedSegment] = []
 
     for page_index, page in enumerate(doc):
@@ -84,12 +87,15 @@ def _parse_pdf(file_path: str) -> ParsedDocument:
     )
 
 
-def parse_document(*, file_path: str, filename: str) -> ParsedDocument:
+def parse_document(*, file_path: str, filename: str, file_bytes: bytes | None = None) -> ParsedDocument:
     path = Path(file_path)
     suffix = path.suffix.lower()
 
     if suffix in {".txt", ".md", ".csv", ".json", ".py", ".log"}:
-        text = path.read_text(encoding="utf-8", errors="ignore")
+        if file_bytes is not None:
+            text = file_bytes.decode("utf-8", errors="ignore")
+        else:
+            text = path.read_text(encoding="utf-8", errors="ignore")
         return ParsedDocument(
             full_text=text,
             segments=[
@@ -102,6 +108,6 @@ def parse_document(*, file_path: str, filename: str) -> ParsedDocument:
         )
 
     if suffix == ".pdf":
-        return _parse_pdf(str(path))
+        return _parse_pdf(str(path), file_bytes=file_bytes)
 
     raise UnsupportedDocumentTypeError(filename)

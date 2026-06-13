@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     COHERE_API_KEY: str | None = None
     COHERE_RERANK_MODEL: str = "rerank-english-v3.0"
 
+    # Supabase Storage (optional – leave blank for local filesystem fallback)
+    SUPABASE_URL: str | None = None
+    SUPABASE_SERVICE_KEY: str | None = None
+    SUPABASE_BUCKET: str = "documents"
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
 import uuid
 from pathlib import Path
 from uuid import UUID
@@ -12,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.errors import IntelVaultError
+from app.core import storage
 from app.models.document import Document
 from app.models.user import User
 
@@ -85,18 +85,14 @@ async def upload_document(
         session.add(document)
         await session.flush()
 
-        storage_root = Path(settings.FILE_STORAGE_ROOT)
-        target_dir = storage_root / "workspaces" / str(workspace_id) / "documents" / str(document.id)
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target_path = target_dir / filename
+        # Build a portable relative key for the storage manager.
+        relative_key = f"workspaces/{workspace_id}/documents/{document.id}/{filename}"
 
-        if target_path.exists():
-            target_path.unlink()
+        # Read the temp file bytes and store via the unified storage layer.
+        file_bytes = tmp_path.read_bytes()
+        stored_path = storage.store_file(relative_key, file_bytes)
 
-        # Run file move synchronously
-        shutil.move(str(tmp_path), str(target_path))
-
-        document.storage_path = str(target_path)
+        document.storage_path = stored_path
         await session.commit()
         await session.refresh(document)
         return document
@@ -108,6 +104,12 @@ async def upload_document(
                 pass
         raise
     finally:
+        # Clean up the local temp file after successful upload.
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
         await file.close()
 
 
@@ -147,14 +149,6 @@ async def delete_workspace_document(
 ) -> None:
     document = await get_workspace_document(session, workspace_id, document_id)
     if document.storage_path:
-        try:
-            path = Path(document.storage_path)
-            if path.exists():
-                path.unlink()
-            parent_dir = path.parent
-            if parent_dir.exists() and not any(parent_dir.iterdir()):
-                parent_dir.rmdir()
-        except Exception:
-            pass
+        storage.delete_file(document.storage_path)
     await session.delete(document)
     await session.commit()

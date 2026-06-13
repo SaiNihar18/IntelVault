@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 
 from app.core.config import settings
+from app.core import storage
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_version import DocumentVersion
@@ -39,10 +40,15 @@ async def process_document(document_id: UUID) -> None:
 
         try:
             logger.info("document_processing_started", extra={"document_id": str(document.id)})
+
+            # Load file bytes from the storage layer (Supabase or local).
+            file_bytes = await asyncio.to_thread(storage.read_file, document.storage_path)
+
             parsed = await asyncio.to_thread(
                 parse_document,
                 file_path=document.storage_path,
                 filename=document.filename,
+                file_bytes=file_bytes,
             )
             candidates = chunk_segments(
                 [

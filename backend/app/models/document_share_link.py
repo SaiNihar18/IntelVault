@@ -53,6 +53,7 @@ class DocumentShareLink(Base):
         server_default=func.now(),
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    encrypted_file_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     workspace: Mapped["Workspace"] = relationship("Workspace")
     document: Mapped["Document"] = relationship("Document", back_populates="share_links")

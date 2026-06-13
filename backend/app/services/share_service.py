@@ -201,12 +201,24 @@ async def resolve_share_token_for_download(
     *,
     share_token: str,
 ) -> tuple[Document, Path]:
+    token_hash = _hash_share_token(share_token)
+    result = await session.execute(
+        select(DocumentShareLink).where(DocumentShareLink.token_hash == token_hash)
+    )
+    link = result.scalar_one_or_none()
+    if link is None:
+        raise ShareLinkNotFoundError()
+
     document = await resolve_share_token(
         session,
         share_token=share_token,
         access_event_type="share_link.downloaded",
     )
-    file_path = Path(document.storage_path)
+    if link.encrypted_file_path:
+        file_path = Path(link.encrypted_file_path)
+    else:
+        file_path = Path(document.storage_path)
+
     if not file_path.is_file():
         raise SharedDocumentFileNotFoundError()
     return document, file_path

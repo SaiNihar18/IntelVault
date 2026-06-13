@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from pathlib import Path
+from fastapi import APIRouter, Depends, status, File, UploadFile
 from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, require_workspace_permission
+from app.core.config import settings
+from app.core.errors import ShareLinkNotFoundError
 from app.core.permissions import Permission
+from app.models.document_share_link import DocumentShareLink
 from app.models.user import User
 from app.models.workspace_membership import WorkspaceMembership
 from app.schemas.share import (
@@ -80,6 +85,46 @@ async def revoke_share_link(
         share_link_id=share_link_id,
         current_user=current_user,
     )
+    return ShareLinkPublic.model_validate(link)
+
+
+@workspace_router.post("/{share_link_id}/file", response_model=ShareLinkPublic)
+async def upload_encrypted_share_file(
+    workspace_id: UUID,
+    document_id: UUID,
+    share_link_id: UUID,
+    file: UploadFile = File(...),
+    _: WorkspaceMembership = Depends(require_workspace_permission(Permission.document_share)),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ShareLinkPublic:
+    result = await session.execute(
+        select(DocumentShareLink).where(
+            DocumentShareLink.id == share_link_id,
+            DocumentShareLink.workspace_id == workspace_id,
+            DocumentShareLink.document_id == document_id,
+        )
+    )
+    link = result.scalar_one_or_none()
+    if link is None:
+        raise ShareLinkNotFoundError()
+
+    storage_root = Path(settings.FILE_STORAGE_ROOT)
+    target_dir = storage_root / "shares" / str(share_link_id)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / "encrypted_payload"
+
+    with open(target_path, "wb") as f:
+        while True:
+            chunk = await file.read(65536)
+            if not chunk:
+                break
+            f.write(chunk)
+
+    link.encrypted_file_path = str(target_path)
+    await session.commit()
+    await session.refresh(link)
+
     return ShareLinkPublic.model_validate(link)
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from pypdf import PdfReader
+import fitz
 
 from app.core.config import settings
 from app.core.errors import IntelVaultError
@@ -29,11 +29,11 @@ class ParsedDocument:
 
 
 def _parse_pdf(file_path: str) -> ParsedDocument:
-    reader = PdfReader(file_path)
+    doc = fitz.open(file_path)
     segments: list[ParsedSegment] = []
 
-    for page_index, page in enumerate(reader.pages):
-        native_text = (page.extract_text() or "").strip()
+    for page_index, page in enumerate(doc):
+        native_text = (page.get_text("text") or "").strip()
         if native_text:
             segments.append(
                 ParsedSegment(
@@ -47,11 +47,14 @@ def _parse_pdf(file_path: str) -> ParsedDocument:
 
         # OCR fallback for image-heavy pages.
         if settings.ENABLE_OCR and len(native_text) < settings.OCR_MIN_PAGE_TEXT_CHARS:
-            images = getattr(page, "images", [])
             ocr_parts: list[str] = []
-            for image_file in images:
+            image_list = page.get_images(full=True)
+            for img_info in image_list:
                 try:
-                    text = run_ocr_on_image_bytes(image_file.data).strip()
+                    xref = img_info[0]
+                    base_image = doc.extract_image(xref)
+                    image_bytes = base_image["image"]
+                    text = run_ocr_on_image_bytes(image_bytes).strip()
                 except Exception:
                     text = ""
                 if text:
@@ -74,9 +77,9 @@ def _parse_pdf(file_path: str) -> ParsedDocument:
         full_text=full_text,
         segments=segments,
         metadata={
-            "parser": "pypdf",
+            "parser": "pymupdf",
             "ocr_enabled": settings.ENABLE_OCR,
-            "page_count": len(reader.pages),
+            "page_count": len(doc),
         },
     )
 

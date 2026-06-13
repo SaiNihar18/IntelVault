@@ -87,7 +87,8 @@ apiClient.interceptors.response.use(
       error.response?.status === 401 &&
       original &&
       !original._retry &&
-      !original.url?.includes("/auth/")
+      !original.url?.includes("/auth/") &&
+      !original.url?.includes("/shares/")
     ) {
       original._retry = true;
       try {
@@ -103,7 +104,7 @@ apiClient.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !original?.url?.includes("/shares/")) {
       tokenStore.clear();
       onUnauthorized();
     }

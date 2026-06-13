@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { apiClient } from "@/lib/apiClient";
 import {
   useCreateShareLink,
   useDocumentShareLinks,
@@ -90,18 +91,83 @@ export function SharesTab({ workspaceId }: { workspaceId: string }) {
   async function handleCreate(data: CreateShareForm) {
     if (!selectedDocument) return;
     try {
+      // 1. Download file plaintext as ArrayBuffer
+      const downloadRes = await apiClient.get(
+        `/workspaces/${workspaceId}/documents/${selectedDocument.id}/download`,
+        { responseType: "arraybuffer" }
+      );
+      const plaintextBuffer = downloadRes.data as ArrayBuffer;
+
+      // 2. Generate random symmetric key
+      const key = await window.crypto.subtle.generateKey(
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        true,
+        ["encrypt", "decrypt"]
+      );
+
+      // 3. Generate 12-byte IV
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+      // 4. Encrypt document
+      const ciphertext = await window.crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv: iv,
+        },
+        key,
+        plaintextBuffer
+      );
+
+      // 5. Prepend IV to ciphertext
+      const encryptedBytes = new Uint8Array(iv.length + ciphertext.byteLength);
+      encryptedBytes.set(iv, 0);
+      encryptedBytes.set(new Uint8Array(ciphertext), iv.length);
+
+      // 6. Export Key as URL-safe Base64
+      const exportedRawKey = await window.crypto.subtle.exportKey("raw", key);
+      const base64Key = btoa(
+        String.fromCharCode(...new Uint8Array(exportedRawKey))
+      )
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+
+      // 7. Create share link on backend
       const response = await createShare.mutateAsync({
         expires_in_hours: data.expires_in_hours,
         max_uses: data.max_uses ?? null,
       });
-      const url = `${window.location.origin}/shares/${response.share_token}`;
-      try { await navigator.clipboard.writeText(url); } catch {}
+
+      // 8. Upload encrypted payload
+      const fileBlob = new Blob([encryptedBytes], { type: "application/octet-stream" });
+      const formData = new FormData();
+      formData.append("file", fileBlob, "encrypted_payload");
+
+      await apiClient.post(
+        `/workspaces/${workspaceId}/documents/${selectedDocument.id}/shares/${response.link.id}/file`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      // 9. Copy URL with key in hash
+      const url = `${window.location.origin}/shares/${response.share_token}#key=${base64Key}`;
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {}
       setLastShareUrl(url);
-      toast.success("Share link created and copied");
+      toast.success("Secure share link created and copied");
       setCreateOpen(false);
       reset({ expires_in_hours: 24, max_uses: null });
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Failed to create share link");
+      toast.error(err?.response?.data?.detail ?? "Failed to create encrypted share link");
+      console.error(err);
     }
   }
 

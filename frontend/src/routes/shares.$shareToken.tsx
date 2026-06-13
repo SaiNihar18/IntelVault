@@ -3,6 +3,7 @@ import { Download, FileText, ShieldCheck, Lock } from "lucide-react";
 import { Brand } from "@/components/Brand";
 import { usePublicShare } from "@/hooks/api";
 import { apiClient } from "@/lib/apiClient";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/shares/$shareToken")({
   component: PublicSharePage,
@@ -21,10 +22,70 @@ function PublicSharePage() {
 
   async function handleDownload() {
     try {
+      // 1. Fetch file as arraybuffer to process decryption
       const res = await apiClient.get(`/shares/${shareToken}/download`, {
-        responseType: "blob",
+        responseType: "arraybuffer",
       });
-      const url = URL.createObjectURL(res.data as Blob);
+      const encryptedBuffer = res.data as ArrayBuffer;
+
+      // 2. Parse key from window.location.hash
+      const hash = window.location.hash;
+      const keyMatch = hash.match(/[#&]key=([^&]+)/);
+      const base64Key = keyMatch ? keyMatch[1] : null;
+
+      let finalBlob: Blob;
+
+      if (base64Key) {
+        try {
+          // 3. Decode base64Key (URL-safe base64)
+          const binaryString = atob(
+            base64Key.replace(/-/g, "+").replace(/_/g, "/")
+          );
+          const keyBytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            keyBytes[i] = binaryString.charCodeAt(i);
+          }
+
+          // 4. Import Cryptographic Key
+          const key = await window.crypto.subtle.importKey(
+            "raw",
+            keyBytes,
+            "AES-GCM",
+            true,
+            ["decrypt"]
+          );
+
+          // 5. Slice IV (first 12 bytes) and ciphertext (rest)
+          const iv = new Uint8Array(encryptedBuffer.slice(0, 12));
+          const ciphertext = encryptedBuffer.slice(12);
+
+          // 6. Decrypt ciphertext
+          const decryptedBuffer = await window.crypto.subtle.decrypt(
+            {
+              name: "AES-GCM",
+              iv: iv,
+            },
+            key,
+            ciphertext
+          );
+
+          finalBlob = new Blob([decryptedBuffer], {
+            type: data?.document.content_type || "application/octet-stream",
+          });
+        } catch (decryptErr) {
+          console.error("Decryption failed:", decryptErr);
+          toast.error("Decryption failed. Check if your share link has the correct key.");
+          return;
+        }
+      } else {
+        // Fallback for legacy unencrypted files
+        finalBlob = new Blob([encryptedBuffer], {
+          type: data?.document.content_type || "application/octet-stream",
+        });
+      }
+
+      // 7. Trigger browser download
+      const url = URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
       a.href = url;
       a.download = data?.document.filename ?? "download";
@@ -32,8 +93,9 @@ function PublicSharePage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch {
-      /* graceful — backend may not be reachable */
+    } catch (err) {
+      console.error("Download failed:", err);
+      toast.error("Failed to download the shared file.");
     }
   }
 

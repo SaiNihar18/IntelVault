@@ -1,7 +1,9 @@
-from __future__ import annotations
-
+import asyncio
+import json
+import logging
 import math
 import re
+import urllib.request
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -9,6 +11,34 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def _cohere_rerank(query: str, documents: list[str], api_key: str, model: str) -> list[dict]:
+    url = "https://api.cohere.com/v1/rerank"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "query": query,
+        "documents": documents,
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data.get("results", [])
+    except Exception as e:
+        logger.error(f"Cohere Rerank API call failed: {e}")
+        return []
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_version import DocumentVersion
@@ -145,4 +175,38 @@ async def retrieve_relevant_chunks(
         )
 
     scored.sort(key=lambda item: item.score, reverse=True)
+    candidates = scored[:20]
+
+    if settings.COHERE_API_KEY and candidates:
+        api_key = settings.COHERE_API_KEY
+        model = settings.COHERE_RERANK_MODEL
+        doc_texts = [c.content for c in candidates]
+
+        results = await asyncio.to_thread(
+            _cohere_rerank,
+            query=question,
+            documents=doc_texts,
+            api_key=api_key,
+            model=model,
+        )
+
+        if results:
+            reranked: list[RetrievedChunk] = []
+            for res in results:
+                idx = res["index"]
+                score = res["relevance_score"]
+                if 0 <= idx < len(candidates):
+                    cand = candidates[idx]
+                    cand.score = score
+                    reranked.append(cand)
+
+            ranked_ids = {c.chunk_id for c in reranked}
+            for cand in candidates:
+                if cand.chunk_id not in ranked_ids:
+                    cand.score = 0.0
+                    reranked.append(cand)
+
+            reranked.sort(key=lambda item: item.score, reverse=True)
+            return reranked[:effective_top_k]
+
     return scored[:effective_top_k]

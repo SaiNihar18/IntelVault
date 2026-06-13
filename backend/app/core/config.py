@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K: int = 5
     RETRIEVAL_MIN_SCORE: float = 0.02
     RETRIEVAL_LEXICAL_WEIGHT: float = 0.25
+    COHERE_API_KEY: str | None = None
+    COHERE_RERANK_MODEL: str = "rerank-english-v3.0"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

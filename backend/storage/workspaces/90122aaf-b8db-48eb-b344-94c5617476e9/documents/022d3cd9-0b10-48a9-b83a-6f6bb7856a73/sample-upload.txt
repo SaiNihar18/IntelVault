@@ -1,2 +1,0 @@
-IntelVault upload test document.
-Created for end-to-end validation.

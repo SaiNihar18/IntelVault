@@ -54,6 +54,7 @@ export function AuditTab({ workspaceId }: { workspaceId: string }) {
         !q ||
         e.event_type.toLowerCase().includes(q) ||
         e.actor_user_id?.toLowerCase().includes(q) ||
+        e.actor_email?.toLowerCase().includes(q) ||
         e.document_id?.toLowerCase().includes(q) ||
         e.chat_session_id?.toLowerCase().includes(q) ||
         JSON.stringify(e.event_metadata).toLowerCase().includes(q)
@@ -114,8 +115,8 @@ export function AuditTab({ workspaceId }: { workspaceId: string }) {
           <thead>
             <tr className="text-xs uppercase tracking-wide text-muted-foreground">
               <th className="text-left font-medium px-5 py-3">Timestamp (UTC)</th>
-              <th className="text-left font-medium px-5 py-3">Event</th>
               <th className="text-left font-medium px-5 py-3">Actor</th>
+              <th className="text-left font-medium px-5 py-3">Event</th>
               <th className="text-left font-medium px-5 py-3">Related</th>
               <th className="text-right font-medium px-5 py-3">Metadata</th>
             </tr>
@@ -166,6 +167,7 @@ function AuditRow({ e, colorIdx }: { e: AuditEntry; colorIdx: number }) {
   const actionClass = ACTION_STYLES[eventType] ?? "text-foreground";
   const isSystem = !e.actor_user_id;
   const metadataText = JSON.stringify(e.event_metadata ?? {}, null, 0);
+  const actorName = isSystem ? "System Agent" : (e.actor_email || shortId(e.actor_user_id));
   return (
     <tr className="border-t border-border hover:bg-background/40 transition-base">
       <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
@@ -183,12 +185,13 @@ function AuditRow({ e, colorIdx }: { e: AuditEntry; colorIdx: number }) {
                 "w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center font-mono",
                 avatarColors[colorIdx % avatarColors.length],
               )}
+              title={e.actor_email || e.actor_user_id || undefined}
             >
-              {initials(e.actor_user_id ?? undefined)}
+              {initials(e.actor_email ?? e.actor_user_id ?? undefined)}
             </span>
           )}
-          <span className="text-sm">
-            {isSystem ? "System Agent" : shortId(e.actor_user_id)}
+          <span className="text-sm" title={e.actor_email || e.actor_user_id || undefined}>
+            {actorName}
           </span>
         </div>
       </td>

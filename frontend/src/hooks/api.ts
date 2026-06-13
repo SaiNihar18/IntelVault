@@ -148,6 +148,7 @@ export interface AuditEntry {
   workspace_id: string;
   event_type: string;
   actor_user_id: string | null;
+  actor_email?: string | null;
   document_id: string | null;
   chat_session_id: string | null;
   event_metadata: Record<string, unknown>;
@@ -296,6 +297,20 @@ export function useChatMessages(workspaceId: string, sessionId: string | null) {
   });
 }
 
+export function useDeleteChatSession(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (chatSessionId: string) => {
+      await apiClient.delete(
+        `/workspaces/${workspaceId}/chat/sessions/${chatSessionId}`,
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: chatKeys.sessions(workspaceId) });
+    },
+  });
+}
+
 export function useSendChatMessage(workspaceId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -323,7 +338,22 @@ export function useSendChatMessage(workspaceId: string) {
               role: "user",
               content: variables.question,
               created_at: new Date().toISOString(),
-              sources: null,
+              sources: variables.document_ids
+                ? variables.document_ids.map((id) => {
+                    const cachedDocs = qc.getQueryData<any[]>(["documents", workspaceId]);
+                    const doc = cachedDocs?.find((d: any) => d.id === id);
+                    return {
+                      chunk_id: "",
+                      document_id: id,
+                      document_filename: doc?.filename || "Attached document",
+                      version_number: 1,
+                      page_number: null,
+                      source_type: "user_attachment",
+                      score: 1.0,
+                      content: "",
+                    };
+                  })
+                : null,
             },
             {
               id: data.assistant_message_id,

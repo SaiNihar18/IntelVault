@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.audit_event import AuditEvent
 
@@ -41,6 +42,7 @@ async def list_workspace_events(
     result = await session.execute(
         select(AuditEvent)
         .where(AuditEvent.workspace_id == workspace_id)
+        .options(selectinload(AuditEvent.actor_user))
         .order_by(AuditEvent.created_at.desc())
         .limit(safe_limit)
     )

@@ -62,3 +62,7 @@ class AuditEvent(Base):
     actor_user: Mapped["User | None"] = relationship("User")
     document: Mapped["Document | None"] = relationship("Document")
     chat_session: Mapped["ChatSession | None"] = relationship("ChatSession")
+
+    @property
+    def actor_email(self) -> str | None:
+        return self.actor_user.email if self.actor_user else None

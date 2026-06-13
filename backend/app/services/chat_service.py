@@ -90,11 +90,27 @@ async def ask_question(
             user_id=user.id,
         )
 
+    # Fetch referenced documents metadata if document_ids are provided
+    user_sources = []
+    if document_ids:
+        doc_result = await session.execute(
+            select(Document).where(
+                Document.id.in_(document_ids),
+                Document.workspace_id == workspace_id,
+            )
+        )
+        db_docs = doc_result.scalars().all()
+        for doc in db_docs:
+            user_sources.append({
+                "document_id": str(doc.id),
+                "document_filename": doc.filename,
+            })
+
     user_message = ChatMessage(
         chat_session_id=chat_session.id,
         role="user",
         content=question,
-        sources=None,
+        sources=user_sources if user_sources else None,
     )
     session.add(user_message)
     await session.flush()
@@ -255,3 +271,20 @@ async def list_chat_messages(
         .limit(safe_limit)
     )
     return list(result.scalars().all())
+
+
+async def delete_chat_session(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    chat_session_id: UUID,
+    user_id: UUID,
+) -> None:
+    chat_session = await _get_chat_session(
+        session,
+        workspace_id=workspace_id,
+        chat_session_id=chat_session_id,
+        user_id=user_id,
+    )
+    await session.delete(chat_session)
+    await session.commit()

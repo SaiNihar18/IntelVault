@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   Paperclip,
-  Tag,
   Send,
   Link as LinkIcon,
   FileText,
@@ -10,6 +9,7 @@ import {
   X,
   Check,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import {
   useChatMessages,
@@ -17,6 +17,7 @@ import {
   useSendChatMessage,
   useDocuments,
   useUploadDocument,
+  useDeleteChatSession,
   type ChatMessage,
 } from "@/hooks/api";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,8 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const deleteSession = useDeleteChatSession(workspaceId);
 
   useEffect(() => {
     setHasSelectedInitial(false);
@@ -110,33 +113,89 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {sessionsArray.map((s) => (
-            <button
+            <div
               key={s.id}
-              onClick={() => setActiveSession(s.id)}
               className={cn(
-                "w-full text-left p-3 rounded-md border transition-base",
+                "group relative w-full p-3 rounded-md border transition-base flex items-center justify-between gap-2",
                 activeSession === s.id
                   ? "border-brand bg-brand/5"
                   : "border-transparent hover:bg-background/60",
               )}
             >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span
-                  className={cn(
-                    "text-sm font-medium truncate",
-                    activeSession === s.id && "text-brand",
-                  )}
-                >
-                  {s.title}
-                </span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {relTime(s.updated_at)}
-                </span>
+              <button
+                type="button"
+                onClick={() => setActiveSession(s.id)}
+                className="flex-1 min-w-0 text-left cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span
+                    className={cn(
+                      "text-sm font-medium truncate",
+                      activeSession === s.id && "text-brand",
+                    )}
+                  >
+                    {s.title}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {relTime(s.updated_at)}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-1">
+                  Open session • {new Date(s.created_at).toLocaleDateString()}
+                </p>
+              </button>
+
+              <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                {deletingSessionId === s.id ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await deleteSession.mutateAsync(s.id);
+                          if (activeSession === s.id) {
+                            setActiveSession(null);
+                          }
+                          toast.success("Conversation deleted");
+                        } catch {
+                          toast.error("Failed to delete conversation");
+                        } finally {
+                          setDeletingSessionId(null);
+                        }
+                      }}
+                      className="text-brand hover:scale-110 p-0.5 rounded cursor-pointer"
+                      title="Confirm delete"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingSessionId(null);
+                      }}
+                      className="text-muted-foreground hover:scale-110 p-0.5 rounded cursor-pointer"
+                      title="Cancel"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingSessionId(s.id);
+                    }}
+                    className="text-muted-foreground hover:text-destructive hover:scale-115 p-0.5 rounded transition-all cursor-pointer"
+                    title="Delete conversation"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground line-clamp-2">
-                Open session • {new Date(s.created_at).toLocaleDateString()}
-              </p>
-            </button>
+            </div>
           ))}
           {!sessions?.length && (
             <p className="text-xs text-muted-foreground p-4 text-center">
@@ -326,14 +385,7 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
                 }}
               />
 
-              <button
-                type="button"
-                aria-label="Tag"
-                className="hover:text-foreground cursor-pointer hover:scale-115 active:scale-95 transition-all duration-300 flex items-center justify-center w-6 h-6 rounded hover:bg-sidebar-accent/60"
-              >
-                <Tag size={16} />
-              </button>
-              <span className="text-xs flex items-center gap-1.5">
+              <span className="text-xs flex items-center gap-1.5 ml-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse-dot" />
                 Ready
               </span>
@@ -363,6 +415,19 @@ function MessageBubble({ m }: { m: ChatMessage }) {
       <div className="flex flex-col items-end animate-fade-up">
         <div className="bg-background border border-border rounded-xl px-4 py-3 max-w-[80%] text-sm">
           {m.content}
+          {m.sources && m.sources.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-2 mt-2 border-t border-border/40">
+              {m.sources.map((s: any, i) => (
+                <div
+                  key={i}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono bg-brand/5 text-brand/80 border border-brand/20 px-1.5 py-0.5 rounded"
+                >
+                  <FileText size={10} />
+                  <span>{s.document_filename || s.filename || "Attached document"}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <span className="text-xs text-muted-foreground mt-1">
           User • {relTime(m.created_at)}

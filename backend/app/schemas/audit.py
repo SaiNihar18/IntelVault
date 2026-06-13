@@ -13,6 +13,7 @@ class AuditEventPublic(BaseModel):
     workspace_id: UUID
     event_type: str
     actor_user_id: UUID | None
+    actor_email: str | None = None
     document_id: UUID | None
     chat_session_id: UUID | None
     event_metadata: dict[str, object]

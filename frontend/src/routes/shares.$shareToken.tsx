@@ -4,6 +4,7 @@ import { Brand } from "@/components/Brand";
 import { usePublicShare } from "@/hooks/api";
 import { apiClient } from "@/lib/apiClient";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/shares/$shareToken")({
   component: PublicSharePage,
@@ -19,6 +20,7 @@ function formatSize(bytes?: number) {
 function PublicSharePage() {
   const { shareToken } = Route.useParams();
   const { data, isLoading, isError } = usePublicShare(shareToken);
+  const { serverStatus } = useAuth();
 
   async function handleDownload() {
     try {
@@ -115,11 +117,18 @@ function PublicSharePage() {
             </div>
             <div className="font-mono text-sm break-all">
               {isLoading
-                ? "Verifying share…"
+                ? (serverStatus === "waking_up"
+                    ? "Waking up server…"
+                    : "Verifying share…")
                 : isError
                   ? "Share unavailable"
                   : data?.document.filename}
             </div>
+            {isLoading && serverStatus === "waking_up" && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-md text-xs font-mono animate-fade-in leading-relaxed">
+                ⚠️ The backend is currently waking up on Render. Verification will complete automatically.
+              </div>
+            )}
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <FileText size={14} />
               <span>{data?.document.content_type ?? "Document"}</span>

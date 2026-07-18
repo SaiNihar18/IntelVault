@@ -10,7 +10,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { login } = useAuth();
+  const { login, serverStatus } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +20,11 @@ function LoginPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
+    if (serverStatus === "waking_up") {
+      toast.info("Connecting to the backend. Your request is queued and will complete automatically once the server is ready...", {
+        duration: 8000,
+      });
+    }
     try {
       await login(email, password);
       toast.success("Welcome back");
@@ -57,8 +62,20 @@ function LoginPage() {
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>© 2026 IntelVault Systems</span>
           <span className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-brand animate-pulse-dot" />
-            System Status: Operational
+            <span className={`w-2 h-2 rounded-full ${
+              serverStatus === "waking_up" 
+                ? "bg-amber-500 animate-pulse-dot" 
+                : serverStatus === "offline" 
+                  ? "bg-red-500" 
+                  : "bg-brand animate-pulse-dot"
+            }`} />
+            <span>
+              {serverStatus === "waking_up"
+                ? "System Status: Waking Up..."
+                : serverStatus === "offline"
+                  ? "System Status: Offline"
+                  : "System Status: Operational"}
+            </span>
           </span>
         </div>
       </div>
@@ -77,6 +94,11 @@ function LoginPage() {
             <p className="text-sm text-muted-foreground mt-1">
               Enter your credentials to access your vault.
             </p>
+            {serverStatus === "waking_up" && (
+              <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-md text-xs font-mono animate-fade-in leading-relaxed">
+                ⚠️ The backend server is currently waking up on Render. Log in will proceed automatically when online.
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

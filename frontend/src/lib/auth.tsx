@@ -17,10 +17,13 @@ export interface AuthUser {
   full_name?: string | null;
 }
 
+export type ServerStatus = "checking" | "waking_up" | "ready" | "offline";
+
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isHydrating: boolean;
+  serverStatus: ServerStatus;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, full_name?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -34,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
+  const [serverStatus, setServerStatus] = useState<ServerStatus>("checking");
 
   const fetchMe = useCallback(async () => {
     try {
@@ -51,6 +55,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       navigate({ to: "/login" });
     });
   }, [navigate, queryClient]);
+
+  // Proactive background server health-checking to detect cold starts
+  useEffect(() => {
+    let active = true;
+    let retryTimer: any;
+
+    const wakeupTimer = setTimeout(() => {
+      if (active) {
+        setServerStatus((current) => current === "checking" ? "waking_up" : current);
+      }
+    }, 1800);
+
+    const checkHealth = async () => {
+      try {
+        await apiClient.get("/health", { timeout: 8000 });
+        clearTimeout(wakeupTimer);
+        if (active) setServerStatus("ready");
+      } catch (err: any) {
+        if (active) {
+          clearTimeout(wakeupTimer);
+          // If the network request failed or timed out, assume the server is waking up
+          setServerStatus("waking_up");
+          retryTimer = setTimeout(checkHealth, 4000);
+        }
+      }
+    };
+
+    checkHealth();
+
+    return () => {
+      active = false;
+      clearTimeout(wakeupTimer);
+      clearTimeout(retryTimer);
+    };
+  }, []);
 
   // Initial hydration
   useEffect(() => {
@@ -120,12 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: !!user,
       isHydrating,
+      serverStatus,
       login,
       register,
       logout,
       refreshMe: fetchMe,
     }),
-    [user, isHydrating, login, register, logout, fetchMe],
+    [user, isHydrating, serverStatus, login, register, logout, fetchMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

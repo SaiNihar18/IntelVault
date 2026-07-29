@@ -14,12 +14,38 @@ from app.core.errors import IntelVaultError
 from app.core.logging import setup_logging
 from app.db.session import engine
 
+from sqlalchemy import text
+
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("application_startup", extra={"app": settings.APP_NAME})
+    
+    # Automatically ensure RLS is enabled on all tables in public schema on startup
+    try:
+        async with engine.begin() as conn:
+            tables = [
+                "workspaces",
+                "workspace_memberships",
+                "documents",
+                "document_versions",
+                "document_chunks",
+                "chat_sessions",
+                "chat_messages",
+                "document_share_links",
+                "audit_events",
+                "users",
+                "refresh_tokens",
+                "alembic_version"
+            ]
+            for table in tables:
+                await conn.execute(text(f"ALTER TABLE IF EXISTS {table} ENABLE ROW LEVEL SECURITY;"))
+        logger.info("row_level_security_enabled_on_startup_tables")
+    except Exception as e:
+        logger.error(f"failed_to_enable_row_level_security_on_startup: {e}")
+
     yield
     await engine.dispose()
     logger.info("application_shutdown", extra={"app": settings.APP_NAME})

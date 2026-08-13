@@ -110,4 +110,19 @@ def parse_document(*, file_path: str, filename: str, file_bytes: bytes | None = 
     if suffix == ".pdf":
         return _parse_pdf(str(path), file_bytes=file_bytes)
 
+    if suffix in {".png", ".jpg", ".jpeg", ".webp"}:
+        if file_bytes is None:
+            file_bytes = path.read_bytes()
+        text = run_ocr_on_image_bytes(file_bytes)
+        return ParsedDocument(
+            full_text=text,
+            segments=[
+                ParsedSegment(
+                    text=text,
+                    metadata={"source_type": "ocr_text", "page_number": 1},
+                )
+            ],
+            metadata={"parser": "pytesseract", "ocr_enabled": True, "page_count": 1},
+        )
+
     raise UnsupportedDocumentTypeError(filename)

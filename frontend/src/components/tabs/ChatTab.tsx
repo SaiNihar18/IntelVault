@@ -365,6 +365,7 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
               <input
                 ref={fileInputRef}
                 type="file"
+                accept=".pdf,.txt,.md,.csv,.json,.py,.log,.png,.jpg,.jpeg,.webp"
                 className="hidden"
                 onChange={async (e) => {
                   const files = e.target.files;

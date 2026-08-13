@@ -115,13 +115,13 @@ export function DocumentsTab({ workspaceId }: { workspaceId: string }) {
           Drag &amp; drop documents here or click to browse.
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Supports PDF, DOCX, TXT (Max 50MB)
+          Supports PDF, TXT, Images, Markdown, Code (Max 50MB)
         </p>
         <input
           ref={fileInput}
           type="file"
           multiple
-            accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp"
+            accept=".pdf,.txt,.md,.csv,.json,.py,.log,.png,.jpg,.jpeg,.webp"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />

@@ -29,12 +29,20 @@ backend_root = Path(__file__).resolve().parent.parent
 async def lifespan(app: FastAPI):
     logger.info("application_startup", extra={"app": settings.APP_NAME})
     
-    # Programmatically run database migrations on startup
+    # Programmatically run database migrations on startup in a separate thread
+    # to avoid "RuntimeError: this event loop is already running" inside ASGI loops.
     try:
-        alembic_cfg = Config(str(backend_root / "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", str(backend_root / "alembic"))
-        alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
-        command.upgrade(alembic_cfg, "head")
+        import threading
+        
+        def run_migrations():
+            alembic_cfg = Config(str(backend_root / "alembic.ini"))
+            alembic_cfg.set_main_option("script_location", str(backend_root / "alembic"))
+            alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
+            command.upgrade(alembic_cfg, "head")
+            
+        thread = threading.Thread(target=run_migrations)
+        thread.start()
+        thread.join()
         logger.info("Database migrations applied successfully on startup.")
     except Exception as migration_exc:
         logger.error(f"Failed to run database migrations on startup: {migration_exc}")

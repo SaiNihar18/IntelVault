@@ -101,12 +101,21 @@ async def process_document(document_id: UUID) -> None:
                 extra={"document_id": str(document.id), "chunks": len(candidates)},
             )
         except Exception as exc:
-            await session.rollback()
-            failed_doc = await session.get(Document, document_id)
-            if failed_doc is not None:
-                failed_doc.status = "failed"
-                await session.commit()
             logger.exception(
                 "document_processing_failed",
                 extra={"document_id": str(document_id), "error": str(exc)},
             )
+            import traceback
+            error_msg = f"{type(exc).__name__}: {str(exc)}\n{traceback.format_exc()}"
+            try:
+                await session.rollback()
+                failed_doc = await session.get(Document, document_id)
+                if failed_doc is not None:
+                    failed_doc.status = "failed"
+                    failed_doc.error_message = error_msg
+                    await session.commit()
+            except Exception as db_exc:
+                logger.exception(
+                    "document_processing_failed_error_persistence_failed",
+                    extra={"document_id": str(document_id), "error": str(db_exc)},
+                )

@@ -17,6 +17,7 @@ class DocumentPublic(BaseModel):
     file_size_bytes: int
     checksum_sha256: str
     status: str
+    error_message: str | None = None
     created_at: datetime
     updated_at: datetime
 

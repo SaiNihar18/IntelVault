@@ -233,6 +233,17 @@ export function DocumentsTab({ workspaceId }: { workspaceId: string }) {
               <DetailRow label="Checksum" value={<code className="break-all font-mono text-xs text-muted-foreground">{selectedDocument.checksum_sha256}</code>} />
               <DetailRow label="Uploaded" value={formatDate(selectedDocument.created_at)} />
               <DetailRow label="Updated" value={formatDate(selectedDocument.updated_at)} />
+              {selectedDocument.status === "failed" && (selectedDocument as any).error_message && (
+                <div className="border-t border-destructive/20 pt-4 space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-destructive flex items-center gap-1.5">
+                    <AlertCircle size={12} />
+                    Processing Error Details
+                  </span>
+                  <pre className="bg-destructive/5 text-destructive border border-destructive/10 rounded-md p-3 text-xs font-mono max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
+                    {(selectedDocument as any).error_message}
+                  </pre>
+                </div>
+              )}
               <div className="flex items-center justify-between border-t border-border pt-4 mt-6">
                 <button
                   type="button"

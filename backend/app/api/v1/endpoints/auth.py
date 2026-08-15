@@ -50,10 +50,14 @@ async def refresh_tokens(
     summary="Revoke a refresh token",
 )
 async def logout(
-    body: RefreshRequest,
+    body: RefreshRequest | None = None,
     session: AsyncSession = Depends(get_db),
 ) -> Response:
-    await auth_service.logout(session, body.refresh_token)
+    if body and body.refresh_token:
+        try:
+            await auth_service.logout(session, body.refresh_token)
+        except Exception:
+            pass
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

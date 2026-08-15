@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -114,6 +115,9 @@ export function MembersTab({ workspaceId }: { workspaceId: string }) {
           <DialogContent className="border-border bg-surface">
             <DialogHeader>
               <DialogTitle className="font-semibold">Invite member</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Grant workspace access and assign role permissions to a team member.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onInvite)} className="space-y-4">
               <div className="space-y-2">

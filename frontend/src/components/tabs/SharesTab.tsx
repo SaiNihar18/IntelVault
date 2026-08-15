@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -196,6 +197,9 @@ export function SharesTab({ workspaceId }: { workspaceId: string }) {
           <DialogContent className="border-border bg-surface">
             <DialogHeader>
               <DialogTitle className="font-semibold">Create share link</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Generate an end-to-end encrypted public access link with custom expiration.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(handleCreate)} className="space-y-4">
               <div className="space-y-2">

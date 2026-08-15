@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -223,6 +224,9 @@ export function DocumentsTab({ workspaceId }: { workspaceId: string }) {
         <DialogContent className="border-border bg-surface max-w-xl">
           <DialogHeader>
             <DialogTitle className="font-semibold">Document details</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Technical metadata, storage identifiers, checksums, and processing details.
+            </DialogDescription>
           </DialogHeader>
           {selectedDocument && (
             <div className="space-y-4 text-sm">

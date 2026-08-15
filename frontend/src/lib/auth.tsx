@@ -144,7 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await apiClient.post("/auth/logout");
+      const refreshToken = tokenStore.refresh;
+      await apiClient.post("/auth/logout", refreshToken ? { refresh_token: refreshToken } : {});
     } catch {
       /* ignore */
     }

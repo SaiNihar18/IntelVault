@@ -142,6 +142,8 @@ async def retrieve_relevant_chunks(
     query_norm = math.sqrt(sum(a * a for a in query_embedding))
     scored: list[RetrievedChunk] = []
 
+    all_chunks_for_docs: list[RetrievedChunk] = []
+
     for chunk_id, embedding, content, chunk_metadata, doc_id, doc_filename, version_number in rows:
         metadata = dict(chunk_metadata or {})
         
@@ -153,26 +155,29 @@ async def retrieve_relevant_chunks(
         lexical_score = _lexical_overlap_score(question, content)
         hybrid_score = ((1.0 - lexical_weight) * similarity) + (lexical_weight * lexical_score)
         
-        if hybrid_score < effective_min_score:
-            continue
-
         page_number = metadata.get("page_number")
         source_type = metadata.get("source_type")
-        scored.append(
-            RetrievedChunk(
-                chunk_id=chunk_id,
-                document_id=doc_id,
-                document_filename=doc_filename,
-                version_number=version_number,
-                page_number=int(page_number) if page_number is not None else None,
-                source_type=str(source_type) if source_type is not None else None,
-                score=hybrid_score,
-                vector_score=similarity,
-                lexical_score=lexical_score,
-                content=content,
-                chunk_metadata=metadata,
-            )
+        retrieved_chunk = RetrievedChunk(
+            chunk_id=chunk_id,
+            document_id=doc_id,
+            document_filename=doc_filename,
+            version_number=version_number,
+            page_number=int(page_number) if page_number is not None else None,
+            source_type=str(source_type) if source_type is not None else None,
+            score=hybrid_score,
+            vector_score=similarity,
+            lexical_score=lexical_score,
+            content=content,
+            chunk_metadata=metadata,
         )
+        all_chunks_for_docs.append(retrieved_chunk)
+
+        # When documents are explicitly selected, do not discard them via min_score threshold
+        if hybrid_score >= effective_min_score or bool(document_ids):
+            scored.append(retrieved_chunk)
+
+    if not scored and document_ids and all_chunks_for_docs:
+        scored = all_chunks_for_docs
 
     scored.sort(key=lambda item: item.score, reverse=True)
     candidates = scored[:20]

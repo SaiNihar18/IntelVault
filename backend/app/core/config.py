@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "deterministic"
     GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
     GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-3.5-flash"
     GEMINI_MAX_RETRIES: int = 3
     GEMINI_RETRY_BASE_DELAY_SECONDS: float = 1.0
     GEMINI_REQUEST_TIMEOUT_SECONDS: float = 60.0

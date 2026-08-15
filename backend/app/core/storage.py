@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -30,7 +31,8 @@ def _supabase_storage_url(object_path: str) -> str:
     """Build the full Supabase Storage Object REST URL."""
     base = settings.SUPABASE_URL.rstrip("/")
     bucket = settings.SUPABASE_BUCKET
-    return f"{base}/storage/v1/object/{bucket}/{object_path}"
+    encoded_path = urllib.parse.quote(object_path, safe="/")
+    return f"{base}/storage/v1/object/{bucket}/{encoded_path}"
 
 
 def _supabase_headers(content_type: str = "application/octet-stream") -> dict[str, str]:

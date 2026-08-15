@@ -8,6 +8,7 @@ from app.core.rbac import WorkspaceRole
 class Permission(str, Enum):
     workspace_create = "workspace:create"
     workspace_view = "workspace:view"
+    workspace_delete = "workspace:delete"
     member_invite = "member:invite"
     member_update_role = "member:update_role"
     document_upload = "document:upload"
@@ -22,6 +23,7 @@ class Permission(str, Enum):
 ROLE_PERMISSIONS: dict[str, set[Permission]] = {
     WorkspaceRole.owner.value: {
         Permission.workspace_view,
+        Permission.workspace_delete,
         Permission.member_invite,
         Permission.member_update_role,
         Permission.document_upload,

@@ -193,6 +193,19 @@ export function useCreateWorkspace() {
   });
 }
 
+export function useDeleteWorkspace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (workspaceId: string) => {
+      await apiClient.delete(`/workspaces/${workspaceId}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: wsKeys.all });
+    },
+  });
+}
+
+
 /* ============================ Documents ============================ */
 
 const docKeys = {

@@ -10,6 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import IntelVaultError
 from app.core.rbac import WorkspaceRole
+from app.core import storage
+from app.models.document import Document
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.workspace_membership import WorkspaceMembership
@@ -206,3 +208,28 @@ async def update_member_role(
     membership.role = role.value
     await session.commit()
     return WorkspaceMemberView(membership=membership, user_email=user.email)
+
+
+async def delete_workspace(
+    session: AsyncSession,
+    workspace_id: UUID,
+    actor_user_id: UUID,
+) -> None:
+    await _ensure_owner(session, workspace_id, actor_user_id)
+    workspace = await _get_workspace(session, workspace_id)
+
+    # Clean up associated physical document files in storage
+    doc_results = await session.execute(
+        select(Document).where(Document.workspace_id == workspace_id)
+    )
+    docs = doc_results.scalars().all()
+    for doc in docs:
+        if doc.storage_path:
+            try:
+                storage.delete_file(doc.storage_path)
+            except Exception:
+                pass
+
+    await session.delete(workspace)
+    await session.commit()
+

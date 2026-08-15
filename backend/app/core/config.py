@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     GEMINI_RETRY_BASE_DELAY_SECONDS: float = 1.0
     GEMINI_REQUEST_TIMEOUT_SECONDS: float = 60.0
     GROQ_API_KEY: str | None = None
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
     GROQ_API_BASE_URL: str = "https://api.groq.com/openai/v1"
     GROQ_MAX_RETRIES: int = 3
     GROQ_RETRY_BASE_DELAY_SECONDS: float = 1.0

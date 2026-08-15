@@ -141,3 +141,16 @@ async def update_member_role(
         joined_at=item.membership.joined_at,
         user_email=item.user_email,
     )
+
+
+@router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workspace(
+    workspace_id: UUID,
+    _: WorkspaceMembership = Depends(
+        require_workspace_permission(Permission.workspace_delete)
+    ),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    await workspace_service.delete_workspace(session, workspace_id, current_user.id)
+

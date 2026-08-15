@@ -11,12 +11,26 @@ from app.core import storage
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_version import DocumentVersion
-from app.services.chunking_service import chunk_segments
+from app.services.chunking_service import ChunkCandidate, chunk_segments
 from app.services.embedding_service import get_embedding_provider
-from app.services.parser_service import parse_document
+from app.services.parser_service import parse_document, sanitize_text
 from app.db.session import async_session_maker
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_data(val: object) -> object:
+    """Recursively strip null bytes from strings, dictionaries, and lists."""
+    if isinstance(val, str):
+        return val.replace("\x00", "")
+    if isinstance(val, dict):
+        return {
+            (k.replace("\x00", "") if isinstance(k, str) else k): _sanitize_data(v)
+            for k, v in val.items()
+        }
+    if isinstance(val, list):
+        return [_sanitize_data(item) for item in val]
+    return val
 
 
 async def process_document(document_id: UUID) -> None:
@@ -50,16 +64,29 @@ async def process_document(document_id: UUID) -> None:
                 filename=document.filename,
                 file_bytes=file_bytes,
             )
+            raw_segments = [
+                {
+                    "text": sanitize_text(seg.text),
+                    "metadata": _sanitize_data(seg.metadata),
+                }
+                for seg in parsed.segments
+            ]
             candidates = chunk_segments(
-                [
-                    {"text": seg.text, "metadata": seg.metadata}
-                    for seg in parsed.segments
-                ],
+                raw_segments,
                 chunk_size=settings.CHUNK_SIZE_CHARS,
                 overlap=settings.CHUNK_OVERLAP_CHARS,
             )
             if not candidates:
-                raise ValueError("No readable text found in document")
+                fallback_content = sanitize_text(parsed.full_text).strip() or f"[Document: {document.filename}]"
+                candidates = [
+                    ChunkCandidate(
+                        content=fallback_content,
+                        metadata={"source_type": "fallback", "page_number": 1, "segment_chunk_index": 0},
+                    )
+                ]
+
+            clean_full_text = sanitize_text(parsed.full_text)
+            clean_metadata = _sanitize_data(parsed.metadata)
 
             max_version_result = await session.execute(
                 select(func.max(DocumentVersion.version_number)).where(
@@ -72,29 +99,31 @@ async def process_document(document_id: UUID) -> None:
                 version_number=int(current_max) + 1,
                 status="ready",
                 source_storage_path=document.storage_path,
-                extracted_text=parsed.full_text,
-                extraction_metadata=parsed.metadata,
+                extracted_text=clean_full_text,
+                extraction_metadata=clean_metadata if isinstance(clean_metadata, dict) else {},
             )
             session.add(version)
             await session.flush()
 
+            clean_contents = [sanitize_text(candidate.content) for candidate in candidates]
             embeddings = await asyncio.to_thread(
                 get_embedding_provider().embed_texts,
-                [candidate.content for candidate in candidates]
+                clean_contents,
             )
-            for idx, (candidate, embedding) in enumerate(zip(candidates, embeddings)):
+            for idx, (content, candidate, embedding) in enumerate(zip(clean_contents, candidates, embeddings)):
                 session.add(
                     DocumentChunk(
                         document_id=document.id,
                         document_version_id=version.id,
                         chunk_index=idx,
-                        content=candidate.content,
+                        content=content,
                         embedding=embedding,
-                        chunk_metadata=candidate.metadata,
+                        chunk_metadata=_sanitize_data(candidate.metadata) if isinstance(candidate.metadata, dict) else {},
                     )
                 )
 
             document.status = "ready"
+            document.error_message = None
             await session.commit()
             logger.info(
                 "document_processing_completed",
@@ -106,7 +135,7 @@ async def process_document(document_id: UUID) -> None:
                 extra={"document_id": str(document_id), "error": str(exc)},
             )
             import traceback
-            error_msg = f"{type(exc).__name__}: {str(exc)}\n{traceback.format_exc()}"
+            error_msg = sanitize_text(f"{type(exc).__name__}: {str(exc)}\n{traceback.format_exc()}")
             try:
                 await session.rollback()
                 failed_doc = await session.get(Document, document_id)
@@ -119,3 +148,4 @@ async def process_document(document_id: UUID) -> None:
                     "document_processing_failed_error_persistence_failed",
                     extra={"document_id": str(document_id), "error": str(db_exc)},
                 )
+

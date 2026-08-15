@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react";
-import { Link, useParams, useRouterState } from "@tanstack/react-router";
+import { Link, useParams, useRouterState, useNavigate } from "@tanstack/react-router";
 import {
   FileText,
   MessageSquare,
@@ -12,14 +12,18 @@ import {
   LogOut,
   Laptop,
   Activity,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Brand } from "./Brand";
 import { useAuth } from "@/lib/auth";
-import { useWorkspace } from "@/hooks/api";
+import { useWorkspace, useDeleteWorkspace } from "@/hooks/api";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -48,6 +52,25 @@ export function AppLayout({
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  const navigate = useNavigate();
+  const deleteWs = useDeleteWorkspace();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const isOwner = !!(user && workspace && workspace.created_by_user_id === user.id);
+
+  async function handleDeleteWorkspace() {
+    if (!workspace) return;
+    try {
+      await deleteWs.mutateAsync(workspace.id);
+      toast.success(`Workspace "${workspace.name}" deleted`);
+      setDeleteConfirmOpen(false);
+      setSettingsOpen(false);
+      navigate({ to: "/workspaces" });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Failed to delete workspace");
+    }
+  }
 
   const currentNav = NAV.find((n) => pathname.endsWith(`/${n.to}`));
 
@@ -148,6 +171,9 @@ export function AppLayout({
               <Settings size={18} className="text-brand" />
               Application Settings
             </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Configure current workspace preferences, system details, and management options.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2 text-sm text-foreground">
             <div className="space-y-1.5 border-b border-border/40 pb-3">
@@ -168,7 +194,7 @@ export function AppLayout({
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 border-b border-border/40 pb-3">
               <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Infrastructure Status</div>
               <div className="space-y-2 pt-1 font-mono text-xs text-muted-foreground">
                 <div className="flex justify-between">
@@ -189,6 +215,63 @@ export function AppLayout({
                 </div>
               </div>
             </div>
+
+            {isOwner && (
+              <div className="space-y-2 pt-1">
+                <div className="text-xs text-destructive font-semibold uppercase tracking-wider">Danger Zone</div>
+                <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/20 bg-destructive/5">
+                  <div className="text-xs">
+                    <p className="font-medium text-foreground">Delete Workspace</p>
+                    <p className="text-muted-foreground text-[11px] mt-0.5">Permanently remove this workspace and all files</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold hover:bg-destructive/90 transition-base cursor-pointer shrink-0"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Workspace Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="border-destructive/30 bg-surface max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-semibold text-lg flex items-center gap-2 text-destructive">
+              <AlertTriangle size={20} />
+              Delete Workspace
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Are you sure you want to delete <strong className="text-foreground">{workspace?.name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2 text-sm text-foreground">
+            <p className="text-xs text-muted-foreground bg-destructive/5 border border-destructive/20 rounded-md p-3 leading-relaxed">
+              This action is permanent and cannot be undone. All documents, uploaded files, extracted embeddings, AI chat sessions, and member shares in this workspace will be immediately deleted.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deleteWs.isPending}
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="px-4 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground transition-base cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteWs.isPending}
+                onClick={handleDeleteWorkspace}
+                className="px-4 py-2 rounded-md bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-base cursor-pointer disabled:opacity-50"
+              >
+                {deleteWs.isPending ? "Deleting…" : "Delete Workspace"}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -201,6 +284,9 @@ export function AppLayout({
               <UserIcon size={18} className="text-brand" />
               User Profile
             </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Your active user account and authentication session details.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center py-4 border-b border-border/30">
             <div className="w-16 h-16 rounded-full bg-brand/10 border border-brand/40 flex items-center justify-center text-brand text-2xl font-bold font-mono mb-3">
@@ -232,3 +318,4 @@ export function AppLayout({
     </div>
   );
 }
+

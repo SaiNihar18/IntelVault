@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, FolderOpen, Calendar, ShieldCheck, LogOut, X } from "lucide-react";
+import { Plus, FolderOpen, Calendar, ShieldCheck, LogOut, X, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Brand } from "@/components/Brand";
 import { useAuth } from "@/lib/auth";
-import { useCreateWorkspace, useWorkspaces } from "@/hooks/api";
+import { useCreateWorkspace, useDeleteWorkspace, useWorkspaces, type Workspace } from "@/hooks/api";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
   component: WorkspacesIndexPage,
@@ -15,8 +15,10 @@ function WorkspacesIndexPage() {
   const navigate = useNavigate();
   const { data: workspaces, isLoading } = useWorkspaces();
   const createWs = useCreateWorkspace();
+  const deleteWs = useDeleteWorkspace();
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
+  const [wsToDelete, setWsToDelete] = useState<Workspace | null>(null);
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -31,6 +33,17 @@ function WorkspacesIndexPage() {
       });
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Could not create workspace");
+    }
+  }
+
+  async function handleDelete() {
+    if (!wsToDelete) return;
+    try {
+      await deleteWs.mutateAsync(wsToDelete.id);
+      toast.success(`Workspace "${wsToDelete.name}" deleted`);
+      setWsToDelete(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Could not delete workspace");
     }
   }
 
@@ -79,28 +92,55 @@ function WorkspacesIndexPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {workspaces.map((ws) => (
-              <Link
+              <div
                 key={ws.id}
-                to="/workspaces/$workspaceId/$tab"
-                params={{ workspaceId: ws.id, tab: "documents" }}
-                className="group block rounded-xl border border-border bg-surface p-6 hover:border-brand/60 hover:shadow-glow transition-all duration-300 hover:-translate-y-1 hover:bg-surface/80"
+                className="group relative flex flex-col justify-between rounded-xl border border-border bg-surface p-6 hover:border-brand/60 hover:shadow-glow transition-all duration-300 hover:-translate-y-1 hover:bg-surface/80"
               >
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand transition-transform duration-350 group-hover:scale-110 group-hover:rotate-6">
-                  <FolderOpen size={18} />
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand transition-transform duration-350 group-hover:scale-110 group-hover:rotate-6">
+                      <FolderOpen size={18} />
+                    </div>
+                    {user && ws.created_by_user_id === user.id && (
+                      <button
+                        type="button"
+                        title="Delete Workspace"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setWsToDelete(ws);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
+                        aria-label="Delete workspace"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                  <Link
+                    to="/workspaces/$workspaceId/$tab"
+                    params={{ workspaceId: ws.id, tab: "documents" }}
+                    className="block"
+                  >
+                    <h2 className="text-2xl font-semibold tracking-tight mb-3 group-hover:text-brand transition-base">
+                      {ws.name}
+                    </h2>
+                    {ws.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-3 mb-4 leading-relaxed">
+                        {ws.description}
+                      </p>
+                    )}
+                  </Link>
                 </div>
-                <h2 className="text-2xl font-semibold tracking-tight mb-3 group-hover:text-brand transition-base">
-                  {ws.name}
-                </h2>
-                {ws.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-3 mb-4 leading-relaxed">
-                    {ws.description}
-                  </p>
-                )}
-                <div className="mt-auto pt-4 flex items-center gap-2 text-xs text-muted-foreground border-t border-border/30">
+                <Link
+                  to="/workspaces/$workspaceId/$tab"
+                  params={{ workspaceId: ws.id, tab: "documents" }}
+                  className="pt-4 flex items-center gap-2 text-xs text-muted-foreground border-t border-border/30"
+                >
                   <Calendar size={14} />
                   Created {new Date(ws.created_at).toLocaleDateString()}
-                </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
         )}
@@ -142,6 +182,51 @@ function WorkspacesIndexPage() {
                 className="px-4 py-2 rounded-md bg-brand text-brand-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60 transition-base cursor-pointer"
               >
                 {createWs.isPending ? "Creating…" : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {wsToDelete && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-up"
+          onClick={() => !deleteWs.isPending && setWsToDelete(null)}
+        >
+          <div
+            className="w-full max-w-md bg-surface border border-destructive/30 rounded-xl p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-full bg-destructive/15 text-destructive shrink-0">
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Delete Workspace?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Are you sure you want to delete <strong className="text-foreground">{wsToDelete.name}</strong>?
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground bg-destructive/5 border border-destructive/20 rounded-md p-3 leading-relaxed">
+              This action is permanent and cannot be undone. All documents, uploaded files, extracted embeddings, AI chat sessions, and member shares in this workspace will be immediately deleted.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deleteWs.isPending}
+                onClick={() => setWsToDelete(null)}
+                className="px-4 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground transition-base cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteWs.isPending}
+                onClick={handleDelete}
+                className="px-4 py-2 rounded-md bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-base cursor-pointer disabled:opacity-50"
+              >
+                {deleteWs.isPending ? "Deleting…" : "Delete Workspace"}
               </button>
             </div>
           </div>

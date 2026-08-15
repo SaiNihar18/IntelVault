@@ -16,6 +16,7 @@ from app.schemas.chat import (
     ChatResponse,
     ChatSessionListResponse,
     ChatSessionPublic,
+    ChatSessionUpdate,
 )
 from app.services import chat_service
 
@@ -100,6 +101,25 @@ async def ask_chat(
     )
 
 
+@router.patch("/sessions/{chat_session_id}", response_model=ChatSessionPublic)
+async def rename_session(
+    workspace_id: UUID,
+    chat_session_id: UUID,
+    body: ChatSessionUpdate,
+    _: WorkspaceMembership = Depends(require_workspace_permission(Permission.document_ask)),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ChatSessionPublic:
+    updated = await chat_service.rename_chat_session(
+        session,
+        workspace_id=workspace_id,
+        chat_session_id=chat_session_id,
+        user_id=current_user.id,
+        title=body.title,
+    )
+    return ChatSessionPublic.model_validate(updated)
+
+
 @router.delete("/sessions/{chat_session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     workspace_id: UUID,
@@ -114,3 +134,4 @@ async def delete_session(
         chat_session_id=chat_session_id,
         user_id=current_user.id,
     )
+

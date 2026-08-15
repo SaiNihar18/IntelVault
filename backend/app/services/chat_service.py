@@ -288,3 +288,24 @@ async def delete_chat_session(
     )
     await session.delete(chat_session)
     await session.commit()
+
+
+async def rename_chat_session(
+    session: AsyncSession,
+    *,
+    workspace_id: UUID,
+    chat_session_id: UUID,
+    user_id: UUID,
+    title: str,
+) -> ChatSession:
+    chat_session = await _get_chat_session(
+        session,
+        workspace_id=workspace_id,
+        chat_session_id=chat_session_id,
+        user_id=user_id,
+    )
+    chat_session.title = title.strip()[:200]
+    await session.commit()
+    await session.refresh(chat_session)
+    return chat_session
+

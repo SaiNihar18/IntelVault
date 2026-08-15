@@ -62,3 +62,8 @@ class ChatSessionListResponse(BaseModel):
 class ChatMessageListResponse(BaseModel):
     chat_session_id: UUID
     messages: list[ChatMessagePublic]
+
+
+class ChatSessionUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+

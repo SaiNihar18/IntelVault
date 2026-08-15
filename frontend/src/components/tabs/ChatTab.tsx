@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Plus,
   Paperclip,
@@ -10,6 +12,7 @@ import {
   Check,
   Loader2,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import {
   useChatMessages,
@@ -18,6 +21,7 @@ import {
   useDocuments,
   useUploadDocument,
   useDeleteChatSession,
+  useRenameChatSession,
   type ChatMessage,
 } from "@/hooks/api";
 import { cn } from "@/lib/utils";
@@ -53,13 +57,17 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editTitleInput, setEditTitleInput] = useState("");
   const deleteSession = useDeleteChatSession(workspaceId);
+  const renameSession = useRenameChatSession(workspaceId);
 
   useEffect(() => {
     setHasSelectedInitial(false);
     setActiveSession(null);
     setSelectedDocs([]);
     setPendingQuestion(null);
+    setEditingSessionId(null);
   }, [workspaceId]);
 
   useEffect(() => {
@@ -96,6 +104,22 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
     }
   }
 
+  async function handleSaveRename(sessionId: string) {
+    const cleanTitle = editTitleInput.trim();
+    if (!cleanTitle) {
+      setEditingSessionId(null);
+      return;
+    }
+    try {
+      await renameSession.mutateAsync({ chatSessionId: sessionId, title: cleanTitle });
+      toast.success("Chat renamed");
+    } catch {
+      toast.error("Failed to rename chat");
+    } finally {
+      setEditingSessionId(null);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-5 h-[calc(100vh-9rem)]">
       {/* Sessions */}
@@ -116,85 +140,134 @@ export function ChatTab({ workspaceId }: { workspaceId: string }) {
             <div
               key={s.id}
               className={cn(
-                "group relative w-full p-3 rounded-md border transition-base flex items-center justify-between gap-2",
+                "group relative w-full p-2.5 rounded-md border transition-base flex items-center justify-between gap-2",
                 activeSession === s.id
                   ? "border-brand bg-brand/5"
                   : "border-transparent hover:bg-background/60",
               )}
             >
-              <button
-                type="button"
-                onClick={() => setActiveSession(s.id)}
-                className="flex-1 min-w-0 text-left cursor-pointer"
-              >
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span
-                    className={cn(
-                      "text-sm font-medium truncate",
-                      activeSession === s.id && "text-brand",
-                    )}
-                  >
-                    {s.title}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {relTime(s.updated_at)}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground line-clamp-1">
-                  Open session • {new Date(s.created_at).toLocaleDateString()}
-                </p>
-              </button>
-
-              <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                {deletingSessionId === s.id ? (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          await deleteSession.mutateAsync(s.id);
-                          if (activeSession === s.id) {
-                            setActiveSession(null);
-                          }
-                          toast.success("Conversation deleted");
-                        } catch {
-                          toast.error("Failed to delete conversation");
-                        } finally {
-                          setDeletingSessionId(null);
-                        }
-                      }}
-                      className="text-brand hover:scale-110 p-0.5 rounded cursor-pointer"
-                      title="Confirm delete"
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeletingSessionId(null);
-                      }}
-                      className="text-muted-foreground hover:scale-110 p-0.5 rounded cursor-pointer"
-                      title="Cancel"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
+              {editingSessionId === s.id ? (
+                <div className="flex-1 flex items-center gap-1.5 min-w-0" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="text"
+                    value={editTitleInput}
+                    onChange={(e) => setEditTitleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveRename(s.id);
+                      if (e.key === "Escape") setEditingSessionId(null);
+                    }}
+                    autoFocus
+                    className="flex-1 min-w-0 bg-background border border-brand/50 rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+                  />
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeletingSessionId(s.id);
-                    }}
-                    className="text-muted-foreground hover:text-destructive hover:scale-115 p-0.5 rounded transition-all cursor-pointer"
-                    title="Delete conversation"
+                    onClick={() => handleSaveRename(s.id)}
+                    disabled={renameSession.isPending}
+                    className="text-brand hover:scale-110 p-1 rounded cursor-pointer shrink-0"
+                    title="Save title"
                   >
-                    <Trash2 size={14} />
+                    <Check size={14} />
                   </button>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingSessionId(null)}
+                    className="text-muted-foreground hover:scale-110 p-1 rounded cursor-pointer shrink-0"
+                    title="Cancel"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSession(s.id)}
+                    className="flex-1 min-w-0 text-left cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span
+                        className={cn(
+                          "text-sm font-medium truncate",
+                          activeSession === s.id && "text-brand",
+                        )}
+                      >
+                        {s.title}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground shrink-0 font-mono">
+                        {relTime(s.updated_at)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      Open session • {new Date(s.created_at).toLocaleDateString()}
+                    </p>
+                  </button>
+
+                  <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    {deletingSessionId === s.id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await deleteSession.mutateAsync(s.id);
+                              if (activeSession === s.id) {
+                                setActiveSession(null);
+                              }
+                              toast.success("Conversation deleted");
+                            } catch {
+                              toast.error("Failed to delete conversation");
+                            } finally {
+                              setDeletingSessionId(null);
+                            }
+                          }}
+                          className="text-brand hover:scale-110 p-0.5 rounded cursor-pointer"
+                          title="Confirm delete"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingSessionId(null);
+                          }}
+                          className="text-muted-foreground hover:scale-110 p-0.5 rounded cursor-pointer"
+                          title="Cancel"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSessionId(s.id);
+                            setEditTitleInput(s.title);
+                          }}
+                          className="text-muted-foreground hover:text-brand hover:scale-115 p-1 rounded transition-all cursor-pointer"
+                          title="Rename chat"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingSessionId(s.id);
+                          }}
+                          className="text-muted-foreground hover:text-destructive hover:scale-115 p-1 rounded transition-all cursor-pointer"
+                          title="Delete conversation"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           ))}
           {!sessions?.length && (
@@ -445,7 +518,49 @@ function MessageBubble({ m }: { m: ChatMessage }) {
         <span className="text-sm font-semibold text-brand">IntelVault AI</span>
       </div>
       <div className="bg-background border border-border rounded-xl px-4 py-3.5 max-w-[85%] text-sm space-y-3">
-        <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+        <div className="markdown-content text-foreground text-sm leading-relaxed">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              p: ({ children }) => <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1.5">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1.5">{children}</ol>,
+              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+              h1: ({ children }) => <h1 className="text-lg font-bold text-foreground mt-3 mb-1.5">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-base font-bold text-foreground mt-2.5 mb-1">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-sm font-bold text-foreground mt-2 mb-1">{children}</h3>,
+              code: ({ inline, className, children, ...props }: any) => {
+                return inline ? (
+                  <code className="bg-muted/70 text-brand px-1.5 py-0.5 rounded font-mono text-xs" {...props}>
+                    {children}
+                  </code>
+                ) : (
+                  <pre className="bg-surface border border-border rounded-lg p-3 my-2 font-mono text-xs overflow-x-auto">
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                );
+              },
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-2 border-brand/60 pl-3 italic my-2 text-muted-foreground">
+                  {children}
+                </blockquote>
+              ),
+              table: ({ children }) => (
+                <div className="overflow-x-auto my-2 border border-border rounded-lg">
+                  <table className="w-full text-xs text-left">{children}</table>
+                </div>
+              ),
+              thead: ({ children }) => <thead className="bg-muted/50 border-b border-border font-semibold">{children}</thead>,
+              th: ({ children }) => <th className="px-3 py-2">{children}</th>,
+              td: ({ children }) => <td className="px-3 py-1.5 border-t border-border/50">{children}</td>,
+            }}
+          >
+            {m.content}
+          </ReactMarkdown>
+        </div>
         {m.sources && m.sources.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/60">
             {m.sources.map((s, i) => (

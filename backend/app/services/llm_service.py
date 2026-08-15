@@ -1,11 +1,34 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from abc import ABC, abstractmethod
 from urllib import error, request
 
 from app.core.config import settings
+
+
+def _clean_llm_response(text: str) -> str:
+    """Clean unwanted citation bracket artifacts and strange unicode spaces."""
+    if not text:
+        return ""
+    # 1. Remove bracketed citation tags like 【...】
+    text = re.sub(r"【[^】]*】", "", text)
+    # 2. Remove inline filename/page bracket citations like [UBS_GTP_2027.pdf, p.2]
+    text = re.sub(
+        r"\[[a-zA-Z0-9_\-.\s]+\.(?:pdf|png|jpg|jpeg|webp|txt|md|csv|json)[^\]]*\]",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # 3. Replace non-breaking / narrow spaces with standard spaces
+    text = text.replace("\u202f", " ").replace("\u00a0", " ").replace("\u200b", "")
+    # 4. Clean stray spaces before punctuation
+    text = re.sub(r" +([.,!?:;])", r"\1", text)
+    # 5. Collapse excessive horizontal spaces
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
 
 
 class ChatCompletionProvider(ABC):
@@ -33,7 +56,7 @@ class DeterministicChatProvider(ChatCompletionProvider):
 
         excerpts = [block.strip() for block in context_blocks[:3] if block.strip()]
         body = " ".join(excerpts)[:1200]
-        return "Based on the accessible documents, the most relevant information is: " + body
+        return _clean_llm_response("Based on the accessible documents, the most relevant information is: " + body)
 
 
 def _build_context_prompt(
@@ -54,7 +77,9 @@ def _build_context_prompt(
         "3. Out-of-Context Queries: If a question requires specific knowledge that is not present in the provided document set (PDS) or context, "
         "do not attempt to guess or cite irrelevant information. Instead, respond formally: 'The requested information is not available within the current workspace documents.' "
         "Append [NO_CONTEXT_USED] at the end of your response.\n"
-        "4. Context-Based Queries: If the answer is present in the context, answer using the context. Cite the document and page details if helpful.\n"
+        "4. Context-Based Queries: If the answer is present in the context, answer using the context with clear explanations.\n"
+        "5. Clean Markdown Formatting: Format your answer with clean, beautiful Markdown (e.g., bullet lists, bold text, headings). "
+        "NEVER include bracketed inline citation markers like 【...】 or [Document.pdf, p.X] inside the response text body.\n"
     )
 
     trimmed_blocks = [block.strip()[:900] for block in context_blocks[:4] if block.strip()]
@@ -161,7 +186,7 @@ class GeminiChatProvider(ChatCompletionProvider):
         content = "".join(part.get("text", "") for part in content_parts if isinstance(part, dict))
         if not content:
             raise RuntimeError("Gemini response missing assistant content")
-        return str(content)
+        return _clean_llm_response(str(content))
 
 
 class GroqChatProvider(ChatCompletionProvider):
@@ -236,7 +261,7 @@ class GroqChatProvider(ChatCompletionProvider):
         content = choices[0].get("message", {}).get("content")
         if content is None:
             raise RuntimeError("Groq response missing assistant content")
-        return str(content)
+        return _clean_llm_response(str(content))
 
 
 def get_chat_completion_provider() -> ChatCompletionProvider:

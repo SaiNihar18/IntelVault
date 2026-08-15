@@ -324,6 +324,22 @@ export function useDeleteChatSession(workspaceId: string) {
   });
 }
 
+export function useRenameChatSession(workspaceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ chatSessionId, title }: { chatSessionId: string; title: string }) => {
+      const { data } = await apiClient.patch<ChatSession>(
+        `/workspaces/${workspaceId}/chat/sessions/${chatSessionId}`,
+        { title },
+      );
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: chatKeys.sessions(workspaceId) });
+    },
+  });
+}
+
 export function useSendChatMessage(workspaceId: string) {
   const qc = useQueryClient();
   return useMutation({

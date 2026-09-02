@@ -14,6 +14,7 @@ import {
   Activity,
   Trash2,
   AlertTriangle,
+  Menu,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Brand } from "./Brand";
@@ -27,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 const NAV = [
   { to: "documents", label: "Documents", icon: FileText },
@@ -52,6 +54,7 @@ export function AppLayout({
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const navigate = useNavigate();
   const deleteWs = useDeleteWorkspace();
@@ -138,10 +141,91 @@ export function AppLayout({
         </div>
       </aside>
 
+      {/* Mobile navigation drawer */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="left" className="w-72 p-0 flex flex-col bg-sidebar border-sidebar-border">
+          <SheetHeader className="px-5 py-5 border-b border-sidebar-border text-left">
+            <SheetTitle asChild>
+              <Link to="/workspaces" onClick={() => setMobileNavOpen(false)} className="block group">
+                <Brand size="md" showSubtitle />
+              </Link>
+            </SheetTitle>
+            <SheetDescription className="sr-only">Workspace navigation menu</SheetDescription>
+          </SheetHeader>
+
+          <nav className="flex-1 px-3 py-4 space-y-1">
+            {NAV.map(({ to, label, icon: Icon }) => {
+              const active = pathname.endsWith(`/${to}`);
+              return (
+                <Link
+                  key={to}
+                  to="/workspaces/$workspaceId/$tab"
+                  params={{ workspaceId, tab: to }}
+                  onClick={() => setMobileNavOpen(false)}
+                  className={cn(
+                    "group flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-base cursor-pointer",
+                    active
+                      ? "bg-sidebar-accent text-brand"
+                      : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  <Icon size={16} strokeWidth={2} />
+                  <span className="uppercase tracking-wide text-xs">{label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="px-3 pb-5 pt-2 border-t border-sidebar-border space-y-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                setSettingsOpen(true);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-base cursor-pointer"
+            >
+              <Settings size={16} />
+              <span>Settings</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                setProfileOpen(true);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-base cursor-pointer"
+            >
+              <UserIcon size={16} />
+              <span className="truncate">{user?.email ?? "User Profile"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileNavOpen(false);
+                logout();
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-base cursor-pointer mt-2"
+            >
+              <LogOut size={16} />
+              <span className="font-semibold uppercase tracking-wider text-xs">Sign Out</span>
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 flex items-center justify-between px-5 border-b border-border bg-background/70 backdrop-blur sticky top-0 z-10">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground min-w-0">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden shrink-0 flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60 transition-base cursor-pointer"
+              aria-label="Open navigation menu"
+            >
+              <Menu size={18} />
+            </button>
             <Link
               to="/workspaces"
               className="hover:text-foreground transition-base truncate"
